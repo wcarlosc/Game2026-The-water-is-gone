@@ -19,10 +19,6 @@ public class DronController : MonoBehaviour
     public float consumoPosado = 0.05f;
     public float umbralPocoCombustible = 3f;
 
-    [Header("Aterrizaje")]
-    [Tooltip("Velocidad máxima para posarse sin que cuente como choque.")]
-    public float velocidadAterrizaje = 3f;
-
     [Header("Referencias")]
     public Transform visual;
     public Animation animacion;
@@ -161,15 +157,15 @@ public class DronController : MonoBehaviour
     }
 
     // ---------------- Colisiones ----------------
-    void OnCollisionEnter(Collision c) { Evaluar(c, true); }
-    void OnCollisionStay(Collision c) { Evaluar(c, false); }
+    void OnCollisionEnter(Collision c) { Evaluar(c); }
+    void OnCollisionStay(Collision c) { Evaluar(c); }
 
     void OnCollisionExit(Collision c)
     {
         if (c.gameObject.layer == capaSeguro) posado = false;
     }
 
-    void Evaluar(Collision c, bool entrada)
+    void Evaluar(Collision c)
     {
         if (reapareciendo) return;
         int capa = c.gameObject.layer;
@@ -180,17 +176,23 @@ public class DronController : MonoBehaviour
             return;
         }
 
-        if (capa == capaSeguro && !posado)
-        {
-            bool desdeArriba = false;
-            for (int i = 0; i < c.contactCount; i++)
-                if (c.GetContact(i).normal.y > 0.6f) { desdeArriba = true; break; }
-            if (!desdeArriba) return;
+        // Caer sobre una plataforma segura siempre la cuenta como checkpoint, sin importar la velocidad.
+        if (capa == capaSeguro && !posado && LlegaDesdeArriba(c))
+            Posar(c.collider);
+    }
 
-            float vel = entrada ? c.relativeVelocity.magnitude : rb.linearVelocity.magnitude;
-            if (vel <= velocidadAterrizaje) Posar(c.collider);
-            else if (entrada) Chocar(); // llegó demasiado rápido
+    // Desde arriba = alguna normal de contacto apunta hacia arriba, o el contacto está en la cara
+    // superior de la plataforma (al caer sobre el borde, la base redonda de la cápsula da normales
+    // diagonales que antes no contaban, y el dron resbalaba hasta el piso de Peligro).
+    bool LlegaDesdeArriba(Collision c)
+    {
+        float tope = c.collider.bounds.max.y;
+        for (int i = 0; i < c.contactCount; i++)
+        {
+            var p = c.GetContact(i);
+            if (p.normal.y > 0.5f || p.point.y >= tope - 0.05f) return true;
         }
+        return false;
     }
 
     void Posar(Collider plataforma)
