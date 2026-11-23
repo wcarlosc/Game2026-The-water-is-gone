@@ -288,13 +288,37 @@ public static class ConstructorTuneles
         return bc;
     }
 
-    // Collider de obstáculo: caja 12 % más pequeña que la malla, ocupando el carril Z = 0.
+    // Collider de obstáculo que sigue la forma real de la malla (piezas irregulares o giradas).
+    // Por cada malla se crea un MeshCollider (no convexo: los colliders estáticos pueden ser cóncavos)
+    // con la misma transformación, encogido un % alrededor de su centro para que los choques sean justos.
+    // Antes se usaba una caja alineada a los ejes con los bounds en mundo, que en piezas giradas o
+    // irregulares cubría mucho espacio vacío y hacía chocar al dron sin tocar nada.
     static void ColliderObstaculo(GameObject go, float reduccion = 0.88f)
     {
+        bool alguno = false;
+        foreach (var mf in go.GetComponentsInChildren<MeshFilter>())
+        {
+            var malla = mf.sharedMesh;
+            var r = mf.GetComponent<Renderer>();
+            if (malla == null || r == null) continue;
+
+            var t = mf.transform;
+            Vector3 c = r.bounds.center;
+            var col = new GameObject("Col_" + go.name + "_" + mf.name);
+            col.transform.SetParent(tCol, false);
+            col.transform.SetPositionAndRotation(c + (t.position - c) * reduccion, t.rotation);
+            col.transform.localScale = t.lossyScale * reduccion;
+            col.layer = capaPeligro;
+            col.AddComponent<MeshCollider>().sharedMesh = malla;
+            alguno = true;
+        }
+        if (alguno) return;
+
+        // Respaldo (p. ej. SkinnedMeshRenderer): caja alineada como antes.
         var rs = go.GetComponentsInChildren<Renderer>();
         if (rs.Length == 0) return;
         Bounds b = rs[0].bounds;
-        foreach (var r in rs) b.Encapsulate(r.bounds);
+        foreach (var rr in rs) b.Encapsulate(rr.bounds);
         var tam = new Vector3(Mathf.Max(0.25f, b.size.x * reduccion), Mathf.Max(0.25f, b.size.y * reduccion), 1.2f);
         Caja("Col_" + go.name, new Vector3(b.center.x, b.center.y, 0f), tam, capaPeligro);
     }
