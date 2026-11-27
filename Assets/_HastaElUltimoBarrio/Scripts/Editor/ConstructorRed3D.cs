@@ -5,7 +5,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-// Construye por codigo MenuPrincipal y los niveles 3D isometricos de superficie (Parte 1: Menu + LVL_07)
+// Construye por codigo MenuPrincipal y los niveles 3D isometricos de superficie (Menu + LVL_07..09)
 // usando prefabs reales de Kit_Pueblo, sin tocar EditorBuildSettings ni las escenas 2.5D de main.
 public static class ConstructorRed3D
 {
@@ -14,28 +14,43 @@ public static class ConstructorRed3D
 
     static int capaJugador, capaSeguro, capaPeligro, capaRecolectable, capaInteractuable;
 
+    [MenuItem("Tools/Hasta el último barrio/Construir menú y niveles 7-9 (Red 3D)")]
+    public static void ConstruirRed3DCompletaInteractivo()
+    {
+        if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+        EjecutarConstruccionCompleta();
+    }
+
+    // Punto de entrada sin dialogos para batchmode (-executeMethod ConstructorRed3D.ConstruirRed3DCompletaBatch).
+    public static void ConstruirRed3DCompletaBatch()
+    {
+        EjecutarConstruccionCompleta();
+    }
+
     [MenuItem("Tools/Hasta el último barrio/Construir menú y nivel 7 (Red 3D)")]
     public static void ConstruirMenuYNivel7Interactivo()
     {
         if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
-        EjecutarConstruccionParte1();
+        EjecutarConstruccionCompleta();
     }
 
-    // Punto de entrada sin dialogos para batchmode (-executeMethod ConstructorRed3D.ConstruirMenuYNivel7Batch).
+    // Alias de compatibilidad para automatizaciones previas.
     public static void ConstruirMenuYNivel7Batch()
     {
-        EjecutarConstruccionParte1();
+        EjecutarConstruccionCompleta();
     }
 
-    static void EjecutarConstruccionParte1()
+    static void EjecutarConstruccionCompleta()
     {
         InicializarCapasYMateriales();
         AsegurarPrefabRover();
         ConstruirMenuPrincipal();
         ConstruirNivel7();
+        ConstruirNivel8();
+        ConstruirNivel9();
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
-        Debug.Log("[ConstructorRed3D] MenuPrincipal y LVL_07_AislamientoFuga generados correctamente.");
+        Debug.Log("[ConstructorRed3D] MenuPrincipal y LVL_07..LVL_09 generados correctamente.");
     }
 
     static void InicializarCapasYMateriales()
@@ -57,12 +72,11 @@ public static class ConstructorRed3D
     {
         string p = R + "Art/Materials/M_Skybox_Superficie_Amanecer.mat";
         var m = AssetDatabase.LoadAssetAtPath<Material>(p);
-        if (m == null)
-        {
-            var sh = Shader.Find("Skybox/Procedural");
-            m = new Material(sh != null ? sh : Shader.Find("Universal Render Pipeline/Lit"));
-            AssetDatabase.CreateAsset(m, p);
-        }
+        if (m != null) return m;
+
+        var sh = Shader.Find("Skybox/Procedural");
+        m = new Material(sh != null ? sh : Shader.Find("Universal Render Pipeline/Lit"));
+        AssetDatabase.CreateAsset(m, p);
         if (m.HasProperty("_SunSize")) m.SetFloat("_SunSize", 0.045f);
         if (m.HasProperty("_AtmosphereThickness")) m.SetFloat("_AtmosphereThickness", 1.30f);
         if (m.HasProperty("_SkyTint")) m.SetColor("_SkyTint", new Color(0.54f, 0.66f, 0.82f));
@@ -76,11 +90,10 @@ public static class ConstructorRed3D
     {
         string p = R + "Art/Materials/" + nombre + ".mat";
         var m = AssetDatabase.LoadAssetAtPath<Material>(p);
-        if (m == null)
-        {
-            m = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-            AssetDatabase.CreateAsset(m, p);
-        }
+        if (m != null) return m;
+
+        m = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+        AssetDatabase.CreateAsset(m, p);
         m.SetColor("_BaseColor", baseCol);
         m.SetFloat("_Smoothness", smoothness);
         m.SetFloat("_Metallic", metallic);
@@ -542,7 +555,7 @@ public static class ConstructorRed3D
         lm.transform.SetParent(sis, false);
         lm.nombreNivel = "Calle de la fuga";
         lm.objetivo = "Cierra la rotura [E], abre el paso al Centro de Salud [E] y confirma la presurización [P].";
-        lm.siguienteEscena = "";
+        lm.siguienteEscena = "LVL_08_DepositoRegulacion";
 
         var gestor = new GameObject("GestorRedSuperficie").AddComponent<GestorRedSuperficie>();
         gestor.transform.SetParent(sis, false);
@@ -556,9 +569,438 @@ public static class ConstructorRed3D
 
         var hud = new GameObject("HUDRed3D").AddComponent<HUDRed3D>();
         hud.transform.SetParent(sis, false);
+        hud.mostrarTarjetasImpacto = false;
 
         ConfigurarIluminacionSuperficie();
         EditorSceneManager.SaveScene(escena, R + "Scenes/Niveles/LVL_07_AislamientoFuga.unity");
+    }
+
+    // ================================================================== NIVEL 8 (DEPOSITO DE REGULACION ALTITUDINAL)
+    public static void ConstruirNivel8()
+    {
+        var escena = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
+
+        var raizPiso = new GameObject("Piso").transform;
+        var raizEntorno = new GameObject("Entorno").transform;
+        var raizTuberias = new GameObject("Tuberias").transform;
+        var raizValvulas = new GameObject("Valvulas").transform;
+        var raizObstaculos = new GameObject("ObstaculosMoviles").transform;
+        var raizBaterias = new GameObject("Baterias").transform;
+
+        // Piso continuo 30x26 m
+        for (int x = -15; x < 15; x += 2)
+        {
+            for (int z = -13; z < 13; z += 2)
+            {
+                string losa = (Mathf.Abs(x) <= 7 && Mathf.Abs(z) <= 7) ? "Suelos/suelo_losas_azul" : "Suelos/suelo_losas_piedra";
+                Poner(losa, new Vector3(x + 1f, 0f, z + 1f), Vector3.zero, Vector3.one, raizPiso);
+            }
+        }
+        var colPiso = new GameObject("ColliderPiso");
+        colPiso.transform.SetParent(raizPiso, false);
+        colPiso.layer = capaSeguro >= 0 ? capaSeguro : 0;
+        var bcPiso = colPiso.AddComponent<BoxCollider>();
+        bcPiso.center = new Vector3(0f, -0.25f, 0f);
+        bcPiso.size = new Vector3(30f, 0.5f, 26f);
+
+        AgregarMuroPerimetral(raizEntorno, new Vector3(0f, 0f, 13.2f), new Vector3(30.4f, 1.2f, 0.5f), horizontal: true, largo: 30);
+        AgregarMuroPerimetral(raizEntorno, new Vector3(0f, 0f, -13.2f), new Vector3(30.4f, 1.2f, 0.5f), horizontal: true, largo: 30);
+        AgregarMuroPerimetral(raizEntorno, new Vector3(-15.2f, 0f, 0f), new Vector3(0.5f, 1.2f, 26.4f), horizontal: false, largo: 26);
+        AgregarMuroPerimetral(raizEntorno, new Vector3(15.2f, 0f, 0f), new Vector3(0.5f, 1.2f, 26.4f), horizontal: false, largo: 26);
+
+        // Infraestructura y sectores con distinta resistencia altitudinal (Mercado 4 m vs Ladera 42 m)
+        PonerConBoxAjustado("Equipos/tanque", new Vector3(-11.5f, 0f, 9.2f), Vector3.zero, Vector3.one * 1.2f, raizEntorno, capaSeguro);
+        PonerConBoxAjustado("Equipos/bomba_agua", new Vector3(-8.5f, 0f, 9.2f), new Vector3(0f, 90f, 0f), Vector3.one * 1.2f, raizEntorno, capaSeguro);
+        PonerConBoxAjustado("Mercado/puesto", new Vector3(-10.5f, 0f, -9.2f), Vector3.zero, Vector3.one, raizEntorno, capaSeguro);
+        PonerConBoxAjustado("Mercado/puesto", new Vector3(-6.8f, 0f, -9.5f), new Vector3(0f, 15f, 0f), Vector3.one, raizEntorno, capaSeguro);
+        PonerConBoxAjustado("Mercado/garrafon", new Vector3(-4.8f, 0f, -9.2f), Vector3.zero, Vector3.one * 1.2f, raizEntorno, capaSeguro);
+
+        PonerConBoxAjustado("Escaleras_y_plataformas/plataforma_2n", new Vector3(10.5f, 0f, 8.8f), Vector3.zero, Vector3.one * 1.15f, raizEntorno, capaSeguro);
+        PonerConBoxAjustado("Edificios/casa_ladrillo", new Vector3(10.5f, 0f, 4.2f), new Vector3(0f, -90f, 0f), Vector3.one * 0.88f, raizEntorno, capaSeguro);
+        PonerConBoxAjustado("Equipos/tanque", new Vector3(6.8f, 0f, 9.2f), Vector3.zero, Vector3.one * 1.05f, raizEntorno, capaSeguro);
+        PonerConBoxAjustado("Edificios/marquesina", new Vector3(10.5f, 0f, -3.2f), new Vector3(0f, -90f, 0f), Vector3.one, raizEntorno, capaSeguro);
+
+        foreach (var posArb in new[] { new Vector3(-13.0f, 0f, 1.5f), new Vector3(13.0f, 0f, 0.5f) })
+        {
+            var arb = Poner("Naturaleza/arbol", posArb, Vector3.zero, Vector3.one * 1.1f, raizEntorno);
+            if (arb != null)
+            {
+                var bcTronco = arb.AddComponent<BoxCollider>();
+                bcTronco.center = new Vector3(0f, 1.1f, 0f);
+                bcTronco.size = new Vector3(0.5f, 2.2f, 0.5f);
+                CapaRecursiva(arb, capaSeguro);
+            }
+        }
+        Poner("Naturaleza/montana", new Vector3(16f, -3f, 50f), new Vector3(0f, 25f, 0f), new Vector3(6f, 4.5f, 6f), raizEntorno);
+
+        Material matSeca = CargarMaterial("M_Tuberia_Seca");
+        Material matCian = CargarMaterial("M_Tuberia_Cian");
+        Material matAmbar = CargarMaterial("M_Ambar_Emisivo");
+        Material matChorro = CargarMaterial("M_Chorro_Cian");
+        Material matRoja = CargarMaterial("M_Alerta_Roja");
+        Material matSalida = CargarMaterial("M_Salida_Lista");
+
+        // Tuberias con BoxCollider ajustado
+        CrearTramoTuberias(raizTuberias, "Troncal_N8", new[]
+        {
+            new Vector3(-7.2f, 0.05f, 8.8f),
+            new Vector3(-5.8f, 0.05f, 6.2f),
+            new Vector3(-5.5f, 0.05f, 3.2f)
+        }, matCian);
+
+        var tubMercado = CrearTramoTuberias(raizTuberias, "RamalMercado_N8", new[]
+        {
+            new Vector3(-5.8f, 0.05f, -4.6f),
+            new Vector3(-7.2f, 0.05f, -6.5f)
+        }, matCian);
+
+        var tubLadera = CrearTramoTuberias(raizTuberias, "RamalLadera_N8", new[]
+        {
+            new Vector3(3.6f, 0.05f, 5.2f),
+            new Vector3(5.6f, 0.05f, 6.6f)
+        }, matSeca);
+
+        // 2 Valvulas continuas (paso 0.20) para equilibrar ambos ramales de distinta altitud
+        var vMercado = CrearConsolaValvula(
+            "Valvula_RamalBajo_Mercado",
+            "V1_Mercado",
+            "Ramal Bajo Mercado (4 m)",
+            new Vector3(-5.2f, 0f, -2.8f),
+            esBinaria: false,
+            aperturaObjetivo: 0.40f,
+            raizValvulas,
+            matSeca,
+            matCian,
+            null,
+            tubMercado,
+            pasoEscalon: 0.20f);
+
+        var vLadera = CrearConsolaValvula(
+            "Valvula_RamalAlto_Ladera",
+            "V5_Ladera",
+            "Ramal Alto Ladera (42 m)",
+            new Vector3(2.2f, 0f, 3.8f),
+            esBinaria: false,
+            aperturaObjetivo: 1.00f,
+            raizValvulas,
+            matSeca,
+            matCian,
+            null,
+            tubLadera,
+            pasoEscalon: 0.20f);
+
+        // Obstaculos moviles cinemáticos (Regla 5)
+        CrearGeiserMovil(raizObstaculos, "Geiser_N8_1", new Vector3(-1.8f, 0f, 0.5f), 0.0f, matAmbar, matChorro);
+        CrearGeiserMovil(raizObstaculos, "Geiser_N8_2", new Vector3(0.5f, 0f, -1.8f), 1.3f, matAmbar, matChorro);
+        CrearGeiserMovil(raizObstaculos, "Geiser_N8_3", new Vector3(5.0f, 0f, 1.2f), 2.5f, matAmbar, matChorro);
+        CrearBarreraOscilante(raizObstaculos, "Barrera_N8_Norte", new Vector3(-1.5f, 0f, 4.5f), new Vector3(4.2f, 0f, 0f), 1.35f, raizObstaculos);
+        CrearBarreraOscilante(raizObstaculos, "Barrera_N8_Sur", new Vector3(3.8f, 0f, -4.8f), new Vector3(0f, 0f, 4.0f), 1.45f, raizObstaculos);
+
+        // Baterias
+        var pfBat = AssetDatabase.LoadAssetAtPath<GameObject>(R + "Prefabs/Kit_Tunel/PF_Bateria.prefab");
+        if (pfBat != null)
+        {
+            foreach (var pos in new[] { new Vector3(-11.8f, 0.65f, -2.0f), new Vector3(0.0f, 0.65f, 8.8f), new Vector3(11.2f, 0.65f, -0.5f) })
+            {
+                var b = (GameObject)PrefabUtility.InstantiatePrefab(pfBat, raizBaterias);
+                b.transform.position = pos;
+            }
+        }
+
+        // Salida
+        var salidaGo = Poner("Juego/plataforma_diana", new Vector3(10.2f, 0.02f, -8.5f), Vector3.zero, Vector3.one * 1.35f, raizEntorno);
+        salidaGo.name = "PF_ZonaSalida";
+        salidaGo.tag = "Finish";
+        CapaRecursiva(salidaGo, capaSeguro);
+        var bcSal = salidaGo.AddComponent<BoxCollider>();
+        bcSal.isTrigger = true;
+        bcSal.center = new Vector3(0f, 0.6f, 0f);
+        bcSal.size = new Vector3(2.6f, 1.2f, 2.6f);
+
+        var anillo = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        anillo.name = "IndicadorSalida";
+        anillo.transform.SetParent(salidaGo.transform, false);
+        anillo.transform.localPosition = new Vector3(0f, 0.25f, 0f);
+        anillo.transform.localScale = new Vector3(1.8f, 0.05f, 1.8f);
+        Object.DestroyImmediate(anillo.GetComponent<Collider>());
+        var renSal = anillo.GetComponent<Renderer>();
+        renSal.sharedMaterial = matRoja;
+
+        // Rover SCADA + PlayerStart
+        Vector3 inicioRover = new Vector3(-11.2f, 0.1f, 3.8f);
+        var pfRover = AssetDatabase.LoadAssetAtPath<GameObject>(R + "Prefabs/Personajes/PF_RoverSCADA.prefab");
+        var rover = (GameObject)PrefabUtility.InstantiatePrefab(pfRover);
+        rover.name = "RoverSCADA";
+        rover.transform.position = inicioRover;
+
+        var start = new GameObject("PlayerStart");
+        start.tag = "Respawn";
+        start.transform.position = inicioRover;
+
+        ConfigurarCamaraIsometrica(rover.transform, inicioRover, 24f);
+
+        var sis = new GameObject("Sistemas").transform;
+        var lm = new GameObject("LevelManager").AddComponent<LevelManager>();
+        lm.transform.SetParent(sis, false);
+        lm.nombreNivel = "Depósito de regulación altitudinal";
+        lm.objetivo = "Regula el ramal bajo (Mercado) y el ramal alto (Ladera) [E], simula [Q] y confirma [P].";
+        lm.siguienteEscena = "LVL_09_PlazaControlEquidad";
+
+        var gestor = new GameObject("GestorRedSuperficie").AddComponent<GestorRedSuperficie>();
+        gestor.transform.SetParent(sis, false);
+        gestor.modoEscenario = ModoRedSuperficie.Nivel08_DepositoRegulacion;
+        gestor.caudalFuente = 100f;
+        gestor.permitirRegulacionRemotaEnHUD = false;
+        gestor.valvulasEscena = new[] { vMercado, vLadera };
+        gestor.indicadorZonaSalida = renSal;
+        gestor.matSalidaPendiente = matRoja;
+        gestor.matSalidaLista = matSalida;
+
+        var hud = new GameObject("HUDRed3D").AddComponent<HUDRed3D>();
+        hud.transform.SetParent(sis, false);
+        hud.mostrarTarjetasImpacto = false;
+
+        ConfigurarIluminacionSuperficie();
+        EditorSceneManager.SaveScene(escena, R + "Scenes/Niveles/LVL_08_DepositoRegulacion.unity");
+    }
+
+    // ================================================================== NIVEL 9 (PLAZA DE CONTROL DE EQUIDAD)
+    public static void ConstruirNivel9()
+    {
+        var escena = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
+
+        var raizPiso = new GameObject("Piso").transform;
+        var raizEntorno = new GameObject("Entorno").transform;
+        var raizTuberias = new GameObject("Tuberias").transform;
+        var raizValvulas = new GameObject("Valvulas").transform;
+        var raizObstaculos = new GameObject("ObstaculosMoviles").transform;
+        var raizBaterias = new GameObject("Baterias").transform;
+
+        // Gran Plaza 34x28 m
+        for (int x = -17; x < 17; x += 2)
+        {
+            for (int z = -14; z < 14; z += 2)
+            {
+                string losa = (Mathf.Abs(x) <= 9 && Mathf.Abs(z) <= 7) ? "Suelos/suelo_losas_ocre" : "Suelos/suelo_losas_piedra";
+                Poner(losa, new Vector3(x + 1f, 0f, z + 1f), Vector3.zero, Vector3.one, raizPiso);
+            }
+        }
+        var colPiso = new GameObject("ColliderPiso");
+        colPiso.transform.SetParent(raizPiso, false);
+        colPiso.layer = capaSeguro >= 0 ? capaSeguro : 0;
+        var bcPiso = colPiso.AddComponent<BoxCollider>();
+        bcPiso.center = new Vector3(0f, -0.25f, 0f);
+        bcPiso.size = new Vector3(34f, 0.5f, 28f);
+
+        AgregarMuroPerimetral(raizEntorno, new Vector3(0f, 0f, 14.2f), new Vector3(34.4f, 1.2f, 0.5f), horizontal: true, largo: 34);
+        AgregarMuroPerimetral(raizEntorno, new Vector3(0f, 0f, -14.2f), new Vector3(34.4f, 1.2f, 0.5f), horizontal: true, largo: 34);
+        AgregarMuroPerimetral(raizEntorno, new Vector3(-17.2f, 0f, 0f), new Vector3(0.5f, 1.2f, 28.4f), horizontal: false, largo: 28);
+        AgregarMuroPerimetral(raizEntorno, new Vector3(17.2f, 0f, 0f), new Vector3(0.5f, 1.2f, 28.4f), horizontal: false, largo: 28);
+
+        // Hitos de los 5 barrios en la plaza con BoxCollider estricto
+        PonerConBoxAjustado("Mercado/puesto", new Vector3(-12.5f, 0f, -9.8f), Vector3.zero, Vector3.one, raizEntorno, capaSeguro);
+        PonerConBoxAjustado("Mercado/puesto", new Vector3(-9.0f, 0f, -10.2f), new Vector3(0f, 20f, 0f), Vector3.one, raizEntorno, capaSeguro);
+        PonerConBoxAjustado("Puente/puente_tramo_arco", new Vector3(-13.2f, 0f, 8.8f), Vector3.zero, Vector3.one * 0.9f, raizEntorno, capaSeguro);
+        PonerConBoxAjustado("Equipos/tanque", new Vector3(-9.5f, 0f, 10.2f), Vector3.zero, Vector3.one * 1.15f, raizEntorno, capaSeguro);
+        PonerConBoxAjustado("Edificios/clinica", new Vector3(0.0f, 0f, 10.5f), Vector3.zero, Vector3.one * 0.9f, raizEntorno, capaSeguro);
+        PonerConBoxAjustado("Edificios/casa_ladrillo", new Vector3(11.8f, 0f, 9.5f), new Vector3(0f, -90f, 0f), Vector3.one * 0.9f, raizEntorno, capaSeguro);
+        PonerConBoxAjustado("Escaleras_y_plataformas/plataforma_2n", new Vector3(13.5f, 0f, 2.2f), Vector3.zero, Vector3.one * 1.1f, raizEntorno, capaSeguro);
+        PonerConBoxAjustado("Equipos/bomba_agua", new Vector3(13.2f, 0f, -1.5f), new Vector3(0f, -90f, 0f), Vector3.one * 1.2f, raizEntorno, capaSeguro);
+
+        // Fuente y Lavadero Comunitario junto a la meta (se iluminan con agua al ganar)
+        PonerConBoxAjustado("Edificios/fuente", new Vector3(5.5f, 0f, -8.8f), Vector3.zero, Vector3.one, raizEntorno, capaSeguro);
+        PonerConBoxAjustado("Equipos/lavadero", new Vector3(9.2f, 0f, -9.2f), new Vector3(0f, 180f, 0f), Vector3.one * 1.25f, raizEntorno, capaSeguro);
+
+        foreach (var posEuc in new[] { new Vector3(-14.5f, 0f, -2.5f), new Vector3(14.5f, 0f, 5.8f) })
+        {
+            var euc = Poner("Naturaleza/eucalipto", posEuc, Vector3.zero, Vector3.one * 1.1f, raizEntorno);
+            if (euc != null)
+            {
+                var bcTronco = euc.AddComponent<BoxCollider>();
+                bcTronco.center = new Vector3(0f, 1.1f, 0f);
+                bcTronco.size = new Vector3(0.5f, 2.2f, 0.5f);
+                CapaRecursiva(euc, capaSeguro);
+            }
+        }
+        Poner("Naturaleza/montana", new Vector3(20f, -3f, 56f), new Vector3(0f, 35f, 0f), new Vector3(6.5f, 4.8f, 6.5f), raizEntorno);
+
+        Material matSeca = CargarMaterial("M_Tuberia_Seca");
+        Material matCian = CargarMaterial("M_Tuberia_Cian");
+        Material matChorro = CargarMaterial("M_Chorro_Cian");
+        Material matAmbar = CargarMaterial("M_Ambar_Emisivo");
+        Material matRoja = CargarMaterial("M_Alerta_Roja");
+        Material matSalida = CargarMaterial("M_Salida_Lista");
+
+        // Efecto visual del lavadero comunitario + fuente activos al equilibrar la red
+        var aguaLavadero = CrearEfectoAguaLavadero(raizEntorno, matChorro);
+
+        // Fuga activa en derivacion antigua
+        PonerConBoxAjustado("Ruinas_e_industria/tubo_roto_base", new Vector3(-6.5f, 0f, 5.8f), new Vector3(0f, 90f, 0f), Vector3.one * 1.2f, raizTuberias, capaSeguro);
+        var visualFuga = CrearVisualFugaActiva(new Vector3(-6.5f, 0.35f, 5.8f), raizTuberias, matChorro);
+
+        // Tuberias por sector + tuberia del lavadero comunitario
+        var tubMercado = CrearTramoTuberias(raizTuberias, "Mercado_N9", new[] { new Vector3(-9.5f, 0.05f, -7.2f), new Vector3(-11.0f, 0.05f, -8.2f) }, matCian);
+        var tubPuente = CrearTramoTuberias(raizTuberias, "Puente_N9", new[] { new Vector3(-6.2f, 0.05f, 3.2f), new Vector3(-9.5f, 0.05f, 6.8f) }, matCian);
+        var tubSalud = CrearTramoTuberias(raizTuberias, "Salud_N9", new[] { new Vector3(-1.0f, 0.05f, 7.2f), new Vector3(1.0f, 0.05f, 7.8f) }, matCian);
+        var tubRefugio = CrearTramoTuberias(raizTuberias, "Refugio_N9", new[] { new Vector3(7.6f, 0.05f, 6.6f), new Vector3(9.4f, 0.05f, 7.6f) }, matCian);
+        var tubLadera = CrearTramoTuberias(raizTuberias, "Ladera_N9", new[] { new Vector3(10.2f, 0.05f, 0.8f), new Vector3(11.8f, 0.05f, 0.5f) }, matSeca);
+        var tubLavadero = CrearTramoTuberias(raizTuberias, "Lavadero_N9", new[] { new Vector3(3.2f, 0.05f, -7.8f), new Vector3(6.8f, 0.05f, -8.2f) }, matSeca);
+
+        // 6 Consolas: 1 de rotura + 5 sectores con paso fino 0.10
+        var vFuga = CrearConsolaValvula("Valvula_AislamientoFuga", "V_AislamientoFuga", "Aislamiento Rotura",
+            new Vector3(-8.5f, 0f, 4.8f), esBinaria: true, aperturaObjetivo: 1f, raizValvulas, matSeca, matCian, visualFuga, null);
+        var vMercado = CrearConsolaValvula("Valvula_Mercado", "V1_Mercado", "Ramal Mercado (4 m)",
+            new Vector3(-8.2f, 0f, -5.8f), esBinaria: false, aperturaObjetivo: 0.30f, raizValvulas, matSeca, matCian, null, tubMercado, 0.10f);
+        var vPuente = CrearConsolaValvula("Valvula_Puente", "V2_Puente", "Ramal Puente (10 m)",
+            new Vector3(-4.2f, 0f, 1.8f), esBinaria: false, aperturaObjetivo: 0.40f, raizValvulas, matSeca, matCian, null, tubPuente, 0.10f);
+        var vSalud = CrearConsolaValvula("Valvula_Salud", "V3_Salud", "Ramal Salud (18 m)",
+            new Vector3(0.0f, 0f, 5.5f), esBinaria: false, aperturaObjetivo: 0.60f, raizValvulas, matSeca, matCian, null, tubSalud, 0.10f);
+        var vRefugio = CrearConsolaValvula("Valvula_Refugio", "V4_Refugio", "Ramal Refugio (26 m)",
+            new Vector3(5.8f, 0f, 5.2f), esBinaria: false, aperturaObjetivo: 0.60f, raizValvulas, matSeca, matCian, null, tubRefugio, 0.10f);
+        var vLadera = CrearConsolaValvula("Valvula_Ladera", "V5_Ladera", "Ramal Ladera (42 m)",
+            new Vector3(8.5f, 0f, 1.2f), esBinaria: false, aperturaObjetivo: 1.00f, raizValvulas, matSeca, matCian, null, tubLadera, 0.10f);
+
+        // Obstaculos moviles (Regla 5)
+        CrearGeiserMovil(raizObstaculos, "Geiser_N9_1", new Vector3(-5.2f, 0f, 1.5f), 0.0f, matAmbar, matChorro);
+        CrearGeiserMovil(raizObstaculos, "Geiser_N9_2", new Vector3(-0.8f, 0f, -1.2f), 1.1f, matAmbar, matChorro);
+        CrearGeiserMovil(raizObstaculos, "Geiser_N9_3", new Vector3(3.2f, 0f, 1.8f), 2.2f, matAmbar, matChorro);
+        CrearGeiserMovil(raizObstaculos, "Geiser_N9_4", new Vector3(4.2f, 0f, -3.8f), 0.7f, matAmbar, matChorro);
+        CrearBarreraOscilante(raizObstaculos, "Barrera_N9_Oeste", new Vector3(-6.5f, 0f, -1.8f), new Vector3(4.4f, 0f, 0f), 1.4f, raizObstaculos);
+        CrearBarreraOscilante(raizObstaculos, "Barrera_N9_Este", new Vector3(7.2f, 0f, -3.5f), new Vector3(0f, 0f, 4.2f), 1.5f, raizObstaculos);
+
+        // Baterias
+        var pfBat = AssetDatabase.LoadAssetAtPath<GameObject>(R + "Prefabs/Kit_Tunel/PF_Bateria.prefab");
+        if (pfBat != null)
+        {
+            foreach (var pos in new[] { new Vector3(-13.2f, 0.65f, 2.5f), new Vector3(-3.5f, 0.65f, 8.8f), new Vector3(8.5f, 0.65f, 7.2f), new Vector3(1.2f, 0.65f, -9.2f) })
+            {
+                var b = (GameObject)PrefabUtility.InstantiatePrefab(pfBat, raizBaterias);
+                b.transform.position = pos;
+            }
+        }
+
+        // Zona de salida junto al lavadero comunitario
+        var salidaGo = Poner("Juego/plataforma_diana", new Vector3(12.2f, 0.02f, -9.2f), Vector3.zero, Vector3.one * 1.35f, raizEntorno);
+        salidaGo.name = "PF_ZonaSalida";
+        salidaGo.tag = "Finish";
+        CapaRecursiva(salidaGo, capaSeguro);
+        var bcSal = salidaGo.AddComponent<BoxCollider>();
+        bcSal.isTrigger = true;
+        bcSal.center = new Vector3(0f, 0.6f, 0f);
+        bcSal.size = new Vector3(2.6f, 1.2f, 2.6f);
+
+        var anillo = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        anillo.name = "IndicadorSalida";
+        anillo.transform.SetParent(salidaGo.transform, false);
+        anillo.transform.localPosition = new Vector3(0f, 0.25f, 0f);
+        anillo.transform.localScale = new Vector3(1.8f, 0.05f, 1.8f);
+        Object.DestroyImmediate(anillo.GetComponent<Collider>());
+        var renSal = anillo.GetComponent<Renderer>();
+        renSal.sharedMaterial = matRoja;
+
+        // Rover SCADA + PlayerStart
+        Vector3 inicioRover = new Vector3(-13.2f, 0.1f, -4.5f);
+        var pfRover = AssetDatabase.LoadAssetAtPath<GameObject>(R + "Prefabs/Personajes/PF_RoverSCADA.prefab");
+        var rover = (GameObject)PrefabUtility.InstantiatePrefab(pfRover);
+        rover.name = "RoverSCADA";
+        rover.transform.position = inicioRover;
+
+        var start = new GameObject("PlayerStart");
+        start.tag = "Respawn";
+        start.transform.position = inicioRover;
+
+        ConfigurarCamaraIsometrica(rover.transform, inicioRover, 26f);
+
+        var sis = new GameObject("Sistemas").transform;
+        var lm = new GameObject("LevelManager").AddComponent<LevelManager>();
+        lm.transform.SetParent(sis, false);
+        lm.nombreNivel = "Plaza de control de equidad";
+        lm.objetivo = "Aísla la fuga en campo [E], simula [Q] y equilibra los 5 barrios [P] para activar el lavadero.";
+        lm.siguienteEscena = "MenuPrincipal";
+
+        var gestor = new GameObject("GestorRedSuperficie").AddComponent<GestorRedSuperficie>();
+        gestor.transform.SetParent(sis, false);
+        gestor.modoEscenario = ModoRedSuperficie.Nivel09_PlazaControlEquidad;
+        gestor.caudalFuente = 100f;
+        gestor.permitirRegulacionRemotaEnHUD = true;
+        gestor.valvulasEscena = new[] { vFuga, vMercado, vPuente, vSalud, vRefugio, vLadera };
+        gestor.indicadorZonaSalida = renSal;
+        gestor.matSalidaPendiente = matRoja;
+        gestor.matSalidaLista = matSalida;
+        gestor.objetosActivarAlEquilibrar = new[] { aguaLavadero };
+        gestor.tuberiasActivarAlEquilibrar = tubLavadero;
+        gestor.matTuberiaActiva = matCian;
+        gestor.matTuberiaSeca = matSeca;
+
+        var hud = new GameObject("HUDRed3D").AddComponent<HUDRed3D>();
+        hud.transform.SetParent(sis, false);
+        hud.mostrarTarjetasImpacto = true;
+
+        ConfigurarIluminacionSuperficie();
+        EditorSceneManager.SaveScene(escena, R + "Scenes/Niveles/LVL_09_PlazaControlEquidad.unity");
+    }
+
+    static void ConfigurarCamaraIsometrica(Transform seguirA, Vector3 inicioRover, float distancia)
+    {
+        var cams = new GameObject("Camaras").transform;
+        var main = Camera.main;
+        main.transform.SetParent(cams, true);
+        main.transform.SetPositionAndRotation(inicioRover + new Vector3(-11f, 16f, -15f), Quaternion.Euler(42f, 35f, 0f));
+        main.fieldOfView = 28f;
+        main.farClipPlane = 200f;
+        main.clearFlags = CameraClearFlags.Skybox;
+        if (main.GetComponent<CinemachineBrain>() == null) main.gameObject.AddComponent<CinemachineBrain>();
+
+        var cmGo = new GameObject("CM_Isometrica");
+        cmGo.transform.SetParent(cams, false);
+        cmGo.transform.SetPositionAndRotation(main.transform.position, Quaternion.Euler(42f, 35f, 0f));
+        var cm = cmGo.AddComponent<CinemachineCamera>();
+        cm.Follow = seguirA;
+        var lens = cm.Lens;
+        lens.FieldOfView = 28f;
+        lens.NearClipPlane = 0.3f;
+        lens.FarClipPlane = 200f;
+        cm.Lens = lens;
+
+        var pc = cmGo.AddComponent<CinemachinePositionComposer>();
+        pc.CameraDistance = distancia;
+        pc.Damping = new Vector3(0.45f, 0.45f, 0.45f);
+        cmGo.AddComponent<CinemachineImpulseListener>();
+    }
+
+    static GameObject CrearEfectoAguaLavadero(Transform padre, Material matChorro)
+    {
+        var raiz = new GameObject("AguaLavaderoActivo");
+        raiz.transform.SetParent(padre, false);
+
+        void PrimitivaSinCol(PrimitiveType tipo, string nombre, Vector3 pos, Vector3 escala)
+        {
+            var go = GameObject.CreatePrimitive(tipo);
+            go.name = nombre;
+            go.transform.SetParent(raiz.transform, false);
+            go.transform.position = pos;
+            go.transform.localScale = escala;
+            Object.DestroyImmediate(go.GetComponent<Collider>());
+            if (matChorro != null) go.GetComponent<Renderer>().sharedMaterial = matChorro;
+        }
+
+        PrimitivaSinCol(PrimitiveType.Cube, "EspejoAguaLavadero", new Vector3(9.2f, 0.78f, -9.2f), new Vector3(1.15f, 0.08f, 0.55f));
+        PrimitivaSinCol(PrimitiveType.Cylinder, "ChorroLavadero", new Vector3(9.2f, 1.05f, -9.05f), new Vector3(0.14f, 0.28f, 0.14f));
+        PrimitivaSinCol(PrimitiveType.Cylinder, "SurtidorFuente", new Vector3(5.5f, 1.05f, -8.8f), new Vector3(0.36f, 0.95f, 0.36f));
+        PrimitivaSinCol(PrimitiveType.Cylinder, "EspejoAguaFuente", new Vector3(5.5f, 0.45f, -8.8f), new Vector3(1.75f, 0.06f, 1.75f));
+
+        var luz = new GameObject("LuzLavaderoActivo").AddComponent<Light>();
+        luz.transform.SetParent(raiz.transform, false);
+        luz.transform.position = new Vector3(7.5f, 2.2f, -9.0f);
+        luz.type = LightType.Point;
+        luz.color = new Color(0.20f, 0.92f, 1f);
+        luz.range = 6.0f;
+        luz.intensity = 2.4f;
+        luz.shadows = LightShadows.None;
+
+        DesactivarEstaticoRecursivo(raiz);
+        raiz.SetActive(false);
+        return raiz;
     }
 
     static void AgregarMuroPerimetral(Transform padre, Vector3 centro, Vector3 tamCollider, bool horizontal, int largo)
@@ -619,7 +1061,8 @@ public static class ConstructorRed3D
         Material matSeca,
         Material matCian,
         GameObject objetoFuga,
-        Renderer[] tuberias)
+        Renderer[] tuberias,
+        float pasoEscalon = 0.20f)
     {
         var raiz = new GameObject(nombre);
         raiz.transform.SetParent(padre, false);
@@ -647,6 +1090,7 @@ public static class ConstructorRed3D
         nv.nombreVisible = nombreVisible;
         nv.esBinaria = esBinaria;
         nv.aperturaObjetivo = aperturaObjetivo;
+        nv.pasoEscalon = pasoEscalon;
         nv.manijaRotable = manija != null ? manija.transform : null;
         nv.luzIndicadora = luz;
         nv.objetoFugaAsociada = objetoFuga;

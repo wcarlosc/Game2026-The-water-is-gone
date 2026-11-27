@@ -26,6 +26,10 @@ public class GestorRedSuperficie : MonoBehaviour
     public Renderer indicadorZonaSalida;
     public Material matSalidaPendiente;
     public Material matSalidaLista;
+    public GameObject[] objetosActivarAlEquilibrar;
+    public Renderer[] tuberiasActivarAlEquilibrar;
+    public Material matTuberiaActiva;
+    public Material matTuberiaSeca;
 
     public GrafoHidraulico Grafo { get; private set; }
     public ResultadoHidraulico ResultadoReal { get; private set; }
@@ -88,7 +92,7 @@ public class GestorRedSuperficie : MonoBehaviour
             Grafo.FijarApertura("V2_Puente", 0.40f);
             Grafo.FijarApertura("V3_Salud", 0.65f);
             Grafo.FijarApertura("V4_Refugio", 0.60f);
-            Grafo.FijarApertura("V5_Ladera", 1.00f);
+            Grafo.FijarApertura("V5_Ladera", 0.40f);
         }
         else
         {
@@ -266,9 +270,56 @@ public class GestorRedSuperficie : MonoBehaviour
 
     void ActualizarIndicadorSalida(bool lista)
     {
-        if (indicadorZonaSalida == null) return;
-        Material target = lista ? matSalidaLista : matSalidaPendiente;
-        if (target != null) indicadorZonaSalida.sharedMaterial = target;
+        if (indicadorZonaSalida != null)
+        {
+            Material target = lista ? matSalidaLista : matSalidaPendiente;
+            if (target != null) indicadorZonaSalida.sharedMaterial = target;
+        }
+
+        if (objetosActivarAlEquilibrar != null)
+        {
+            foreach (var go in objetosActivarAlEquilibrar)
+            {
+                if (go != null) go.SetActive(lista);
+            }
+        }
+
+        if (tuberiasActivarAlEquilibrar != null)
+        {
+            Material matTub = lista ? matTuberiaActiva : matTuberiaSeca;
+            if (matTub != null)
+            {
+                foreach (var r in tuberiasActivarAlEquilibrar)
+                {
+                    if (r != null) r.sharedMaterial = matTub;
+                }
+            }
+        }
+    }
+
+    public string ObtenerResumenComparativoJain()
+    {
+        if (ResultadoReal == null || Grafo == null) return "";
+
+        float jJug = ResultadoReal.IndiceEquidadJain;
+        bool tieneOpt = SolucionOptima != null && SolucionOptima.ResultadoOptimo != null;
+        float jOpt = tieneOpt ? SolucionOptima.ResultadoOptimo.IndiceEquidadJain : 1f;
+        float efic = jOpt > 1e-4f ? Mathf.Clamp01(jJug / jOpt) * 100f : 100f;
+
+        var claves = new[] { "V1_Mercado", "V2_Puente", "V3_Salud", "V4_Refugio", "V5_Ladera" };
+        var cortos = new[] { "V1", "V2", "V3", "V4", "V5" };
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"Equidad Jain: Jugador {jJug:0.000} vs Óptimo {jOpt:0.000} ({efic:0.0}% del óptimo)");
+
+        for (int i = 0; i < claves.Length; i++)
+        {
+            var a = Grafo.ObtenerArista(claves[i]);
+            float apJug = a != null ? a.Apertura : 0f;
+            float apOpt = tieneOpt && SolucionOptima.AperturasOptimas.TryGetValue(claves[i], out float vo) ? vo : apJug;
+            sb.Append($"{cortos[i]}:{Mathf.RoundToInt(apJug * 100f)}%/{Mathf.RoundToInt(apOpt * 100f)}%");
+            if (i < claves.Length - 1) sb.Append("  |  ");
+        }
+        return sb.ToString();
     }
 
     public float ObtenerAperturaMostrada(string aristaId)

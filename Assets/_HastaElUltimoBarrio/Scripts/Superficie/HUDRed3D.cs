@@ -1,15 +1,20 @@
 using System.Collections.Generic;
 using HastaElUltimoBarrio.Dominio;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 // HUD para los niveles en superficie 3D: bateria SCADA, puntaje %, fallos X/5,
-// panel de los 5 sectores con Indice de Jain y simulador "¿Que pasaria si...?".
+// panel de los 5 sectores con Indice de Jain, tarjetas de impacto social y simulador "¿Que pasaria si...?".
 public class HUDRed3D : MonoBehaviour
 {
     public static HUDRed3D Instancia { get; private set; }
 
+    [Header("Opciones de Nivel")]
+    public bool mostrarTarjetasImpacto = false;
+
     static readonly Color PanelOscuro = new Color(0.05f, 0.08f, 0.11f, 0.78f);
+    static readonly Color TarjetaFondo = new Color(0.08f, 0.12f, 0.17f, 0.90f);
     static readonly Color Ambar = new Color(1f, 0.62f, 0.10f);
     static readonly Color Cian = new Color(0.15f, 0.80f, 0.88f);
     static readonly Color VerdeOk = new Color(0.22f, 0.82f, 0.48f);
@@ -26,6 +31,12 @@ public class HUDRed3D : MonoBehaviour
         public Button BtnMas;
     }
 
+    class TarjetaImpactoUI
+    {
+        public Outline Borde;
+        public Text Texto;
+    }
+
     static readonly Dictionary<string, string> SectorAArista = new Dictionary<string, string>
     {
         { "S1_Mercado", "V1_Mercado" },
@@ -33,6 +44,15 @@ public class HUDRed3D : MonoBehaviour
         { "S3_Salud", "V3_Salud" },
         { "S4_Refugio", "V4_Refugio" },
         { "S5_Ladera", "V5_Ladera" }
+    };
+
+    static readonly Dictionary<string, string> ImpactoRestablecidoPorSector = new Dictionary<string, string>
+    {
+        { "S1_Mercado", "Lavado higiénico de alimentos restablecido." },
+        { "S2_Puente", "Presión domiciliaria continua en viviendas." },
+        { "S3_Salud", "Esterilización e instrumental operativos." },
+        { "S4_Refugio", "Comedor comunitario con reserva activa." },
+        { "S5_Ladera", "Agua en pilones altos sin acarreo en baldes." }
     };
 
     Font fuente;
@@ -44,12 +64,13 @@ public class HUDRed3D : MonoBehaviour
     Text txtBateria, txtPuntaje, txtChoques, txtJain, txtEstadoRed, txtAvisoAccion, txtMensaje, txtResultado;
     Image panelDerechoImg;
     Outline bordeSimulacion;
-    Button btnSimular, btnRestaurar, btnConfirmar;
+    Button btnSimular, btnAplicarSim, btnRestaurar, btnConfirmar;
     Text txtBtnSimular;
     GameObject bannerMision;
     Image bannerMisionImg;
     GameObject panelResultado;
     readonly List<FilaSectorUI> filas = new List<FilaSectorUI>();
+    readonly List<TarjetaImpactoUI> tarjetasImpacto = new List<TarjetaImpactoUI>();
 
     float mensajeHasta;
     int ultDecimas = -1, ultPuntaje = -1, ultChoques = -1, ultMaxChoques = -1;
@@ -148,8 +169,8 @@ public class HUDRed3D : MonoBehaviour
             fila.BarraImg = fila.Barra.GetComponent<Image>();
 
             int idx = i;
-            fila.BtnMenos = Boton(pDer, "-", new Vector2(402f, y - 30f), new Vector2(48f, 30f), new Color(0.18f, 0.24f, 0.30f), Color.white, () => AjustarFila(idx, -0.10f));
-            fila.BtnMas = Boton(pDer, "+", new Vector2(458f, y - 30f), new Vector2(48f, 30f), new Color(0.18f, 0.24f, 0.30f), Color.white, () => AjustarFila(idx, 0.10f));
+            fila.BtnMenos = Boton(pDer, "-", new Vector2(402f, y - 30f), new Vector2(48f, 30f), new Color(0.18f, 0.24f, 0.30f), Color.white, () => AjustarFila(idx, -0.05f));
+            fila.BtnMas = Boton(pDer, "+", new Vector2(458f, y - 30f), new Vector2(48f, 30f), new Color(0.18f, 0.24f, 0.30f), Color.white, () => AjustarFila(idx, 0.05f));
             filas.Add(fila);
         }
 
@@ -157,11 +178,36 @@ public class HUDRed3D : MonoBehaviour
             new Color(0.15f, 0.36f, 0.44f), Color.white, () => gestor?.AlternarModoSimulacion());
         txtBtnSimular = btnSimular.GetComponentInChildren<Text>();
 
+        btnAplicarSim = Boton(pDer, "Aplicar a Red", new Vector2(266f, -544f), new Vector2(128f, 48f),
+            new Color(0.16f, 0.56f, 0.42f), Color.white, () => gestor?.AplicarSimulacionARealSiPermitido());
+        btnAplicarSim.gameObject.SetActive(false);
+
         btnRestaurar = Boton(pDer, "Vista Real", new Vector2(342f, -544f), new Vector2(168f, 48f),
             new Color(0.26f, 0.26f, 0.30f), Color.white, () => gestor?.RestaurarVistaReal());
 
         btnConfirmar = Boton(pDer, "Confirmar Presurización [P]", new Vector2(20f, -606f), new Vector2(490f, 54f),
             Ambar, Color.black, () => gestor?.ConfirmarPresurizacion());
+
+        // 2b. Tarjetas de impacto social (solo en LVL_09, bajo PanelEstado en margen izquierdo libre)
+        if (mostrarTarjetasImpacto)
+        {
+            var pImp = Caja(canvasGo.transform, "PanelImpactoSocial", new Vector2(0f, 1f), new Vector2(26f, -194f),
+                new Vector2(460f, 446f), PanelOscuro, new Vector2(0f, 1f));
+            Texto(pImp, "IMPACTO SOCIAL EN BARRIOS", new Vector2(18f, -12f), new Vector2(424f, 28f), 20, Cian, TextAnchor.MiddleLeft, FontStyle.Bold);
+
+            for (int i = 0; i < 5; i++)
+            {
+                float y = -48f - i * 78f;
+                var card = Caja(pImp, "Impacto_" + i, new Vector2(0f, 1f), new Vector2(18f, y),
+                    new Vector2(424f, 70f), TarjetaFondo, new Vector2(0f, 1f));
+                var borde = card.gameObject.AddComponent<Outline>();
+                borde.effectColor = RojoAlerta;
+                borde.effectDistance = new Vector2(1.5f, -1.5f);
+
+                var txtCard = Texto(card, "", new Vector2(12f, -6f), new Vector2(400f, 58f), 17, Color.white, TextAnchor.MiddleLeft, FontStyle.Normal);
+                tarjetasImpacto.Add(new TarjetaImpactoUI { Borde = borde, Texto = txtCard });
+            }
+        }
 
         // 3. Banner de mision centrado arriba (entre PanelEstado y PanelSCADA) y aviso inferior de interaccion
         var rtBanner = Caja(canvasGo.transform, "BannerMision", new Vector2(0.482f, 1f), new Vector2(0f, -26f),
@@ -186,14 +232,26 @@ public class HUDRed3D : MonoBehaviour
         rtAv.anchoredPosition = new Vector2(0f, 28f);
         txtAvisoAccion.gameObject.AddComponent<Outline>().effectColor = Color.black;
 
-        // 4. Panel resultado fin de nivel
+        // 4. Panel resultado fin de nivel (incluye comparativa Jugador vs Optimo de Jain)
         var res = Caja(canvasGo.transform, "Resultado", new Vector2(0.5f, 0.5f), Vector2.zero,
-            new Vector2(720f, 400f), new Color(0.05f, 0.08f, 0.1f, 0.90f), new Vector2(0.5f, 0.5f));
+            new Vector2(860f, 500f), new Color(0.05f, 0.08f, 0.1f, 0.92f), new Vector2(0.5f, 0.5f));
         panelResultado = res.gameObject;
-        txtResultado = Texto(res, "", Vector2.zero, new Vector2(680f, 360f), 34, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
+        var bordeRes = panelResultado.AddComponent<Outline>();
+        bordeRes.effectColor = Cian;
+        bordeRes.effectDistance = new Vector2(2f, -2f);
+
+        txtResultado = Texto(res, "", Vector2.zero, new Vector2(800f, 380f), 25, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
         var rtR = txtResultado.rectTransform;
         rtR.anchorMin = rtR.anchorMax = rtR.pivot = new Vector2(0.5f, 0.5f);
-        rtR.anchoredPosition = Vector2.zero;
+        rtR.anchoredPosition = new Vector2(0f, 30f);
+
+        var btnMenu = Boton(res, "Volver al Menú Principal", Vector2.zero, new Vector2(320f, 48f),
+            Ambar, Color.black, VolverMenuPrincipal);
+        var rtBtnMenu = (RectTransform)btnMenu.transform;
+        rtBtnMenu.anchorMin = rtBtnMenu.anchorMax = new Vector2(0.5f, 0f);
+        rtBtnMenu.pivot = new Vector2(0.5f, 0f);
+        rtBtnMenu.anchoredPosition = new Vector2(0f, 22f);
+
         panelResultado.SetActive(false);
     }
 
@@ -260,7 +318,25 @@ public class HUDRed3D : MonoBehaviour
         txtJain.text = $"{prefijoSim}Equidad Jain: {res.IndiceEquidadJain:0.000}   (Óptimo: {optJain:0.000})";
         bordeSimulacion.effectColor = gestor.ModoSimulacionActivo ? Ambar : Cian;
         txtBtnSimular.text = gestor.ModoSimulacionActivo ? "Salir Simulación [Q]" : "¿Qué pasaría si…? [Q]";
+
+        bool puedeAplicar = gestor.ModoSimulacionActivo && gestor.permitirRegulacionRemotaEnHUD;
+        if (btnAplicarSim != null) btnAplicarSim.gameObject.SetActive(puedeAplicar);
         btnRestaurar.gameObject.SetActive(gestor.ModoSimulacionActivo);
+
+        var rtSim = (RectTransform)btnSimular.transform;
+        var rtRest = (RectTransform)btnRestaurar.transform;
+        if (puedeAplicar)
+        {
+            rtSim.sizeDelta = new Vector2(236f, 48f);
+            rtRest.anchoredPosition = new Vector2(402f, -544f);
+            rtRest.sizeDelta = new Vector2(108f, 48f);
+        }
+        else
+        {
+            rtSim.sizeDelta = new Vector2(310f, 48f);
+            rtRest.anchoredPosition = new Vector2(342f, -544f);
+            rtRest.sizeDelta = new Vector2(168f, 48f);
+        }
 
         if (res.FugaActivaDetectada)
         {
@@ -298,6 +374,20 @@ public class HUDRed3D : MonoBehaviour
 
             f.BtnMenos.interactable = permitirBotones && !string.IsNullOrEmpty(f.AristaId);
             f.BtnMas.interactable = permitirBotones && !string.IsNullOrEmpty(f.AristaId);
+
+            if (i < tarjetasImpacto.Count)
+            {
+                var card = tarjetasImpacto[i];
+                bool ok = s.Abastecido && !res.FugaActivaDetectada;
+                card.Borde.effectColor = ok ? VerdeOk : RojoAlerta;
+                string msgOk = ImpactoRestablecidoPorSector.TryGetValue(s.Id, out var txtOk)
+                    ? txtOk
+                    : "Caudal mínimo vital cubierto.";
+                card.Texto.text = ok
+                    ? $"{s.Nombre}: {msgOk}"
+                    : $"{s.Nombre}: «{s.ImpactoSocialSinAgua}»";
+                card.Texto.color = ok ? new Color(0.84f, 0.98f, 0.88f) : new Color(1f, 0.86f, 0.84f);
+            }
         }
     }
 
@@ -320,9 +410,24 @@ public class HUDRed3D : MonoBehaviour
     void MostrarResultado(string texto)
     {
         panelResultado.SetActive(true);
-        txtResultado.text = texto;
+        string completo = texto;
+        if (gestor != null && gestor.ResultadoReal != null)
+        {
+            string comp = gestor.ObtenerResumenComparativoJain();
+            if (!string.IsNullOrEmpty(comp))
+                completo += "\n\n" + comp;
+            if (gestor.modoEscenario == ModoRedSuperficie.Nivel09_PlazaControlEquidad && gestor.RedEquilibradaConfirmada)
+                completo += "\n\n¡Lavadero comunitario activo! Agua equitativa hasta el último barrio.";
+        }
+        txtResultado.text = completo;
         txtMensaje.text = "";
         if (bannerMision != null) bannerMision.SetActive(false);
+    }
+
+    void VolverMenuPrincipal()
+    {
+        if (Application.CanStreamedLevelBeLoaded("MenuPrincipal"))
+            SceneManager.LoadScene("MenuPrincipal");
     }
 
     RectTransform Caja(Transform padre, string nombre, Vector2 ancla, Vector2 pos, Vector2 tam, Color color, Vector2 pivote)

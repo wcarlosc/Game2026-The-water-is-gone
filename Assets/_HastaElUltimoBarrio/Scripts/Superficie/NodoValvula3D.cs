@@ -41,8 +41,8 @@ public class NodoValvula3D : MonoBehaviour
         if (esBinaria)
             return actual > 0.01f ? 0f : Mathf.Clamp01(aperturaObjetivo);
 
-        float siguiente = actual + pasoEscalon;
-        if (siguiente > 1.01f) siguiente = 0f;
+        float siguiente = Mathf.Round((actual + pasoEscalon) * 20f) / 20f;
+        if (siguiente > 1.001f) siguiente = 0f;
         return Mathf.Clamp01(siguiente);
     }
 
