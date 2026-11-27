@@ -127,5 +127,42 @@ namespace HastaElUltimoBarrio.Tests.EditMode
             Assert.IsNotNull(optimo.ResultadoOptimo);
             Assert.LessOrEqual(Mathf.Abs(optimo.ResultadoOptimo.IndiceEquidadJain - simulado.IndiceEquidadJain), 0.02f);
         }
+
+        [Test]
+        public void CatalogoFichasMision_NueveNivelesYRutaSecuencialEstanCompletos()
+        {
+            string[] niveles =
+            {
+                "LVL_01_GaleriaCaptacion",
+                "LVL_02_TunelPresion",
+                "LVL_03_SifonMercado",
+                "LVL_04_ConductoSalud",
+                "LVL_05_ImpulsionLadera",
+                "LVL_06_CamaraRefugioPuente",
+                "LVL_07_AislamientoFuga",
+                "LVL_08_DepositoRegulacion",
+                "LVL_09_PlazaControlEquidad"
+            };
+
+            for (int i = 0; i < niveles.Length; i++)
+            {
+                var ficha = CatalogoFichasMision.ObtenerFicha(niveles[i]);
+                Assert.IsNotNull(ficha);
+                Assert.IsFalse(string.IsNullOrEmpty(ficha.Titulo), niveles[i]);
+                Assert.IsFalse(string.IsNullOrEmpty(ficha.SituacionBarrio), niveles[i]);
+                Assert.GreaterOrEqual(ficha.Controles.Length, 4, niveles[i]);
+                foreach (var c in ficha.Controles)
+                {
+                    Assert.IsFalse(string.IsNullOrEmpty(c.Tecla));
+                    Assert.IsFalse(string.IsNullOrEmpty(c.Accion));
+                }
+                Assert.GreaterOrEqual(ficha.PasosGanar.Length, 3, niveles[i]);
+                Assert.AreEqual(i >= 6, ficha.EsSuperficie3D, niveles[i]);
+            }
+
+            Assert.AreEqual("LVL_08_DepositoRegulacion", CatalogoFichasMision.ObtenerSiguienteEscenaPorDefecto("LVL_07_AislamientoFuga"));
+            Assert.AreEqual("LVL_09_PlazaControlEquidad", CatalogoFichasMision.ObtenerSiguienteEscenaPorDefecto("LVL_08_DepositoRegulacion"));
+            Assert.AreEqual("MenuPrincipal", CatalogoFichasMision.ObtenerSiguienteEscenaPorDefecto("LVL_09_PlazaControlEquidad"));
+        }
     }
 }

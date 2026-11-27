@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using HastaElUltimoBarrio.Dominio;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 // HUD para los niveles en superficie 3D: bateria SCADA, puntaje %, fallos X/5,
@@ -88,7 +87,7 @@ public class HUDRed3D : MonoBehaviour
 
     void Start()
     {
-        MenuPrincipalUI.AsegurarEventSystem();
+        CargadorEscenasSeguro.AsegurarEventSystemInputSystem();
         lm = LevelManager.Instancia;
         gestor = GestorRedSuperficie.Instancia;
         fuente = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
@@ -426,8 +425,7 @@ public class HUDRed3D : MonoBehaviour
 
     void VolverMenuPrincipal()
     {
-        if (Application.CanStreamedLevelBeLoaded("MenuPrincipal"))
-            SceneManager.LoadScene("MenuPrincipal");
+        CargadorEscenasSeguro.IntentarCargar("MenuPrincipal");
     }
 
     RectTransform Caja(Transform padre, string nombre, Vector2 ancla, Vector2 pos, Vector2 tam, Color color, Vector2 pivote)

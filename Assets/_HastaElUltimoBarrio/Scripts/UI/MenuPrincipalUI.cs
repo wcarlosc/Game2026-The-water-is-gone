@@ -1,13 +1,9 @@
 using System;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
-using UnityEngine.InputSystem.UI;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 #if UNITY_EDITOR
 using UnityEditor;
-using UnityEditor.SceneManagement;
 #endif
 
 // Menu principal construido por codigo: titulo institucional, guion corto,
@@ -39,9 +35,7 @@ public class MenuPrincipalUI : MonoBehaviour
 
     public static void AsegurarEventSystem()
     {
-        if (EventSystem.current != null) return;
-        var es = new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
-        DontDestroyOnLoad(es);
+        CargadorEscenasSeguro.AsegurarEventSystemInputSystem();
     }
 
     void Start()
@@ -161,22 +155,8 @@ public class MenuPrincipalUI : MonoBehaviour
         gm.Telemetria.IniciarSesion();
         AudioManager.Instancia.SonarLlegada();
 
-        if (Application.CanStreamedLevelBeLoaded(escenaIniciarMision))
-        {
-            SceneManager.LoadScene(escenaIniciarMision);
-            return;
-        }
-
-#if UNITY_EDITOR
-        string[] guids = AssetDatabase.FindAssets(escenaIniciarMision + " t:Scene", new[] { "Assets/_HastaElUltimoBarrio/Scenes" });
-        if (guids.Length > 0)
-        {
-            string ruta = AssetDatabase.GUIDToAssetPath(guids[0]);
-            EditorSceneManager.LoadSceneInPlayMode(ruta, new LoadSceneParameters(LoadSceneMode.Single));
-            return;
-        }
-#endif
-        Debug.LogWarning("No se encontro la escena inicial en Build Settings: " + escenaIniciarMision);
+        if (!CargadorEscenasSeguro.IntentarCargar(escenaIniciarMision))
+            Debug.LogWarning("No se encontro la escena inicial: " + escenaIniciarMision);
     }
 
     public void Salir()

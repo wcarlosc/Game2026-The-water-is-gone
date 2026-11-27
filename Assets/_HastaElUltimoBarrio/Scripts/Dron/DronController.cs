@@ -68,6 +68,8 @@ public class DronController : MonoBehaviour
 
     void Update()
     {
+        if (MisionTutorialUI.JuegoBloqueadoPorTutorial) return;
+
         var lm = LevelManager.Instancia;
         bool activo = lm == null || !lm.Terminado;
         if (invulnerable > 0f) invulnerable -= Time.deltaTime;
@@ -89,9 +91,9 @@ public class DronController : MonoBehaviour
 
         if (kb != null)
         {
-            pulso |= kb.wKey.wasPressedThisFrame || kb.aKey.wasPressedThisFrame || kb.sKey.wasPressedThisFrame || kb.dKey.wasPressedThisFrame;
+            pulso |= kb.wKey.wasPressedThisFrame || kb.aKey.wasPressedThisFrame || kb.sKey.wasPressedThisFrame || kb.dKey.wasPressedThisFrame || kb.spaceKey.wasPressedThisFrame;
             pulso |= kb.upArrowKey.wasPressedThisFrame || kb.leftArrowKey.wasPressedThisFrame || kb.downArrowKey.wasPressedThisFrame || kb.rightArrowKey.wasPressedThisFrame;
-            if (kb.wKey.isPressed || kb.upArrowKey.isPressed) dir.y += 1f;
+            if (kb.wKey.isPressed || kb.upArrowKey.isPressed || kb.spaceKey.isPressed) dir.y += 1f;
             if (kb.sKey.isPressed || kb.downArrowKey.isPressed) dir.y -= 1f;
             if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) dir.x += 1f;
             if (kb.aKey.isPressed || kb.leftArrowKey.isPressed) dir.x -= 1f;

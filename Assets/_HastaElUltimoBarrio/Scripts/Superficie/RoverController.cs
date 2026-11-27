@@ -55,6 +55,12 @@ public class RoverController : MonoBehaviour
 
     void Update()
     {
+        if (MisionTutorialUI.JuegoBloqueadoPorTutorial)
+        {
+            entradaMovimiento = Vector2.zero;
+            return;
+        }
+
         var lm = LevelManager.Instancia;
         bool activo = lm == null || !lm.Terminado;
         if (invulnerable > 0f) invulnerable -= Time.deltaTime;

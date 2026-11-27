@@ -76,6 +76,8 @@ public class ChorroFugaMovil3D : MonoBehaviour
 
     void FixedUpdate()
     {
+        if (MisionTutorialUI.PausaActiva) return;
+
         if (modo == ModoObstaculoSuperficie.BarreraOscilante)
         {
             float t = Mathf.PingPong((Time.time + desfaseInicial) * velocidad, 1f);
