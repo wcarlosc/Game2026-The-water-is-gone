@@ -40,6 +40,12 @@ public class GestorRedSuperficie : MonoBehaviour
     readonly Dictionary<string, float> aperturasSimuladas = new Dictionary<string, float>();
     readonly Dictionary<string, NodoValvula3D> mapaValvulas = new Dictionary<string, NodoValvula3D>();
 
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ReiniciarEstatico()
+    {
+        Instancia = null;
+    }
+
     void Awake()
     {
         Instancia = this;

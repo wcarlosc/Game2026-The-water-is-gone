@@ -46,11 +46,19 @@ public class HUDRed3D : MonoBehaviour
     Outline bordeSimulacion;
     Button btnSimular, btnRestaurar, btnConfirmar;
     Text txtBtnSimular;
+    GameObject bannerMision;
+    Image bannerMisionImg;
     GameObject panelResultado;
     readonly List<FilaSectorUI> filas = new List<FilaSectorUI>();
 
     float mensajeHasta;
     int ultDecimas = -1, ultPuntaje = -1, ultChoques = -1, ultMaxChoques = -1;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ReiniciarEstatico()
+    {
+        Instancia = null;
+    }
 
     void Awake()
     {
@@ -155,20 +163,28 @@ public class HUDRed3D : MonoBehaviour
         btnConfirmar = Boton(pDer, "Confirmar Presurización [P]", new Vector2(20f, -606f), new Vector2(490f, 54f),
             Ambar, Color.black, () => gestor?.ConfirmarPresurizacion());
 
-        // 3. Aviso de interaccion inferior y mensajes centrales
-        txtAvisoAccion = Texto(canvasGo.transform, "", Vector2.zero, new Vector2(780f, 54f), 26, Ambar, TextAnchor.MiddleCenter, FontStyle.Bold);
-        var rtAv = txtAvisoAccion.rectTransform;
-        rtAv.anchorMin = rtAv.anchorMax = new Vector2(0.5f, 0.08f);
-        rtAv.pivot = new Vector2(0.5f, 0.5f);
-        rtAv.anchoredPosition = Vector2.zero;
-        txtAvisoAccion.gameObject.AddComponent<Outline>().effectColor = Color.black;
+        // 3. Banner de mision centrado arriba (entre PanelEstado y PanelSCADA) y aviso inferior de interaccion
+        var rtBanner = Caja(canvasGo.transform, "BannerMision", new Vector2(0.482f, 1f), new Vector2(0f, -26f),
+            new Vector2(780f, 92f), PanelOscuro, new Vector2(0.5f, 1f));
+        bannerMision = rtBanner.gameObject;
+        bannerMisionImg = rtBanner.GetComponent<Image>();
+        var bordeBanner = bannerMision.AddComponent<Outline>();
+        bordeBanner.effectColor = Cian;
+        bordeBanner.effectDistance = new Vector2(1.5f, -1.5f);
 
-        txtMensaje = Texto(canvasGo.transform, "", Vector2.zero, new Vector2(1180f, 120f), 32, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
+        txtMensaje = Texto(rtBanner, "", Vector2.zero, new Vector2(740f, 78f), 25, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
         var rtMsg = txtMensaje.rectTransform;
-        rtMsg.anchorMin = rtMsg.anchorMax = new Vector2(0.36f, 0.86f);
-        rtMsg.pivot = new Vector2(0.5f, 0.5f);
+        rtMsg.anchorMin = rtMsg.anchorMax = rtMsg.pivot = new Vector2(0.5f, 0.5f);
         rtMsg.anchoredPosition = Vector2.zero;
         txtMensaje.gameObject.AddComponent<Outline>().effectColor = Color.black;
+        bannerMision.SetActive(false);
+
+        txtAvisoAccion = Texto(canvasGo.transform, "", Vector2.zero, new Vector2(760f, 52f), 26, Ambar, TextAnchor.MiddleCenter, FontStyle.Bold);
+        var rtAv = txtAvisoAccion.rectTransform;
+        rtAv.anchorMin = rtAv.anchorMax = new Vector2(0.482f, 0f);
+        rtAv.pivot = new Vector2(0.5f, 0f);
+        rtAv.anchoredPosition = new Vector2(0f, 28f);
+        txtAvisoAccion.gameObject.AddComponent<Outline>().effectColor = Color.black;
 
         // 4. Panel resultado fin de nivel
         var res = Caja(canvasGo.transform, "Resultado", new Vector2(0.5f, 0.5f), Vector2.zero,
@@ -213,10 +229,21 @@ public class HUDRed3D : MonoBehaviour
         if (txtMensaje != null && txtMensaje.text.Length > 0)
         {
             float resto = mensajeHasta - Time.time;
+            float alfa = Mathf.Clamp01(resto / 0.6f);
             var c = txtMensaje.color;
-            c.a = Mathf.Clamp01(resto / 0.6f);
+            c.a = alfa;
             txtMensaje.color = c;
-            if (resto <= 0f) txtMensaje.text = "";
+            if (bannerMisionImg != null)
+            {
+                var cb = PanelOscuro;
+                cb.a = PanelOscuro.a * alfa;
+                bannerMisionImg.color = cb;
+            }
+            if (resto <= 0f)
+            {
+                txtMensaje.text = "";
+                if (bannerMision != null) bannerMision.SetActive(false);
+            }
         }
     }
 
@@ -282,6 +309,9 @@ public class HUDRed3D : MonoBehaviour
     public void MostrarAlertaTemporal(string texto, float duracion)
     {
         if (txtMensaje == null) return;
+        bool hayTexto = !string.IsNullOrEmpty(texto);
+        if (bannerMision != null) bannerMision.SetActive(hayTexto);
+        if (bannerMisionImg != null) bannerMisionImg.color = PanelOscuro;
         txtMensaje.text = texto;
         txtMensaje.color = Color.white;
         mensajeHasta = Time.time + duracion;
@@ -292,6 +322,7 @@ public class HUDRed3D : MonoBehaviour
         panelResultado.SetActive(true);
         txtResultado.text = texto;
         txtMensaje.text = "";
+        if (bannerMision != null) bannerMision.SetActive(false);
     }
 
     RectTransform Caja(Transform padre, string nombre, Vector2 ancla, Vector2 pos, Vector2 tam, Color color, Vector2 pivote)

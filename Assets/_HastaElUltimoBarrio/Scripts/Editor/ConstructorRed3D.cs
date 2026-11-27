@@ -114,20 +114,75 @@ public static class ConstructorRed3D
         return go;
     }
 
-    static GameObject PonerSolido(string ruta, Vector3 pos, Vector3 euler, Vector3 escala, Transform padre, Vector3 colCenter, Vector3 colSize)
+    static GameObject PonerConBoxAjustado(string ruta, Vector3 pos, Vector3 euler, Vector3 escala, Transform padre, int capa = -1)
     {
         var go = Poner(ruta, pos, euler, escala, padre);
         if (go == null) return null;
-        var bc = go.AddComponent<BoxCollider>();
-        bc.center = colCenter;
-        bc.size = colSize;
+        AgregarBoxAjustado(go, go, capa >= 0 ? capa : capaSeguro);
         return go;
+    }
+
+    static void AgregarBoxAjustado(GameObject destinoCollider, GameObject raizMallas, int capa)
+    {
+        if (destinoCollider == null || raizMallas == null) return;
+        if (!TryCalcularBoundsLocales(destinoCollider.transform, raizMallas, out Bounds b)) return;
+
+        var bc = destinoCollider.AddComponent<BoxCollider>();
+        bc.center = b.center;
+        bc.size = new Vector3(
+            Mathf.Max(0.08f, b.size.x),
+            Mathf.Max(0.08f, b.size.y),
+            Mathf.Max(0.08f, b.size.z));
+        if (capa >= 0) CapaRecursiva(destinoCollider, capa);
+    }
+
+    static bool TryCalcularBoundsLocales(Transform espacioDestino, GameObject raizMallas, out Bounds resultado)
+    {
+        resultado = default;
+        bool iniciado = false;
+        var filtros = raizMallas.GetComponentsInChildren<MeshFilter>(true);
+        foreach (var mf in filtros)
+        {
+            if (mf.sharedMesh == null) continue;
+            Bounds mb = mf.sharedMesh.bounds;
+            Vector3 c = mb.center;
+            Vector3 e = mb.extents;
+
+            for (int sx = -1; sx <= 1; sx += 2)
+            for (int sy = -1; sy <= 1; sy += 2)
+            for (int sz = -1; sz <= 1; sz += 2)
+            {
+                Vector3 esquinaMalla = c + new Vector3(e.x * sx, e.y * sy, e.z * sz);
+                Vector3 mundo = mf.transform.TransformPoint(esquinaMalla);
+                Vector3 local = espacioDestino.InverseTransformPoint(mundo);
+                if (!iniciado)
+                {
+                    resultado = new Bounds(local, Vector3.zero);
+                    iniciado = true;
+                }
+                else
+                {
+                    resultado.Encapsulate(local);
+                }
+            }
+        }
+        return iniciado;
     }
 
     static void QuitarColliders(GameObject go)
     {
         foreach (var c in go.GetComponentsInChildren<Collider>(true))
             Object.DestroyImmediate(c, true);
+    }
+
+    static void DesactivarEstaticoRecursivo(GameObject go)
+    {
+        if (go == null) return;
+        foreach (var t in go.GetComponentsInChildren<Transform>(true))
+        {
+            t.gameObject.isStatic = false;
+            GameObjectUtility.SetStaticEditorFlags(t.gameObject, 0);
+        }
     }
 
     static void CapaRecursiva(GameObject go, int capa)
@@ -172,15 +227,15 @@ public static class ConstructorRed3D
         rb.useGravity = true;
         rb.linearDamping = 0.5f;
         rb.angularDamping = 6f;
-        rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
+        rb.constraints = RigidbodyConstraints.FreezeRotation;
         rb.interpolation = RigidbodyInterpolation.Interpolate;
         rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
 
         var cap = raiz.AddComponent<CapsuleCollider>();
         cap.direction = 1;
-        cap.center = new Vector3(0f, 0.55f, 0f);
-        cap.height = 1.1f;
-        cap.radius = 0.48f;
+        cap.center = new Vector3(0f, 0.58f, 0f);
+        cap.height = 1.12f;
+        cap.radius = 0.44f;
 
         string pmPath = R + "Art/Materials/PM_Rover.asset";
         var pm = AssetDatabase.LoadAssetAtPath<PhysicsMaterial>(pmPath);
@@ -200,6 +255,8 @@ public static class ConstructorRed3D
         rc.visual = visual.transform;
         rc.sacudida = imp;
 
+        // Quita BatchingStatic/StaticEditorFlags heredados de Kit_Pueblo para que la malla siga al Rigidbody
+        DesactivarEstaticoRecursivo(raiz);
         CapaRecursiva(raiz, capaJugador);
         PrefabUtility.SaveAsPrefabAsset(raiz, p);
         Object.DestroyImmediate(raiz);
@@ -297,26 +354,37 @@ public static class ConstructorRed3D
         }
         var colPiso = new GameObject("ColliderPiso");
         colPiso.transform.SetParent(raizPiso, false);
+        colPiso.layer = capaSeguro >= 0 ? capaSeguro : 0;
         var bcPiso = colPiso.AddComponent<BoxCollider>();
         bcPiso.center = new Vector3(0f, -0.25f, 0f);
         bcPiso.size = new Vector3(28f, 0.5f, 24f);
 
-        // Muros perimetrales (altura 1.2m)
-        AgregarMuroPerimetral(raizEntorno, new Vector3(0f, 0f, 12.2f), new Vector3(28.8f, 1.5f, 0.6f), horizontal: true, largo: 28);
-        AgregarMuroPerimetral(raizEntorno, new Vector3(0f, 0f, -12.2f), new Vector3(28.8f, 1.5f, 0.6f), horizontal: true, largo: 28);
-        AgregarMuroPerimetral(raizEntorno, new Vector3(-14.2f, 0f, 0f), new Vector3(0.6f, 1.5f, 24.8f), horizontal: false, largo: 24);
-        AgregarMuroPerimetral(raizEntorno, new Vector3(14.2f, 0f, 0f), new Vector3(0.6f, 1.5f, 24.8f), horizontal: false, largo: 24);
+        // Muros perimetrales (colliders estrictos al ancho/alto real del muro)
+        AgregarMuroPerimetral(raizEntorno, new Vector3(0f, 0f, 12.2f), new Vector3(28.4f, 1.2f, 0.5f), horizontal: true, largo: 28);
+        AgregarMuroPerimetral(raizEntorno, new Vector3(0f, 0f, -12.2f), new Vector3(28.4f, 1.2f, 0.5f), horizontal: true, largo: 28);
+        AgregarMuroPerimetral(raizEntorno, new Vector3(-14.2f, 0f, 0f), new Vector3(0.5f, 1.2f, 24.4f), horizontal: false, largo: 24);
+        AgregarMuroPerimetral(raizEntorno, new Vector3(14.2f, 0f, 0f), new Vector3(0.5f, 1.2f, 24.4f), horizontal: false, largo: 24);
 
-        // Edificios e infraestructura del pueblo
-        PonerSolido("Equipos/tanque", new Vector3(-10.5f, 0f, 8.2f), Vector3.zero, Vector3.one * 1.15f, raizEntorno, new Vector3(0f, 0.9f, 0f), new Vector3(2.1f, 1.8f, 2.0f));
-        PonerSolido("Equipos/bomba_agua", new Vector3(-8.0f, 0f, 8.2f), new Vector3(0f, 90f, 0f), Vector3.one * 1.25f, raizEntorno, new Vector3(0f, 0.5f, 0f), new Vector3(1.2f, 1.0f, 0.8f));
-        PonerSolido("Edificios/clinica", new Vector3(9.0f, 0f, 6.2f), new Vector3(0f, -90f, 0f), Vector3.one * 0.95f, raizEntorno, new Vector3(0f, 2.0f, 0.4f), new Vector3(4.6f, 4.0f, 5.2f));
-        PonerSolido("Edificios/casa_ladrillo", new Vector3(-9.5f, 0f, -8.5f), new Vector3(0f, 90f, 0f), Vector3.one * 0.9f, raizEntorno, new Vector3(0f, 1.9f, 0f), new Vector3(4.2f, 3.8f, 4.2f));
-        PonerSolido("Edificios/fuente", new Vector3(0.5f, 0f, -7.8f), Vector3.zero, Vector3.one, raizEntorno, new Vector3(0f, 1.0f, 0f), new Vector3(2.9f, 2.0f, 2.9f));
-        PonerSolido("Equipos/lavadero", new Vector3(4.5f, 0f, -8.5f), new Vector3(0f, 180f, 0f), Vector3.one * 1.15f, raizEntorno, new Vector3(0f, 0.85f, 0f), new Vector3(1.5f, 1.7f, 0.9f));
-        PonerSolido("Mercado/puesto", new Vector3(-1.5f, 0f, 8.5f), Vector3.zero, Vector3.one, raizEntorno, new Vector3(0f, 1.0f, 0f), new Vector3(2.2f, 2.0f, 1.5f));
-        Poner("Naturaleza/eucalipto", new Vector3(-12.2f, 0f, 2.5f), Vector3.zero, Vector3.one * 1.1f, raizEntorno);
-        Poner("Naturaleza/eucalipto", new Vector3(12.2f, 0f, -2.5f), Vector3.zero, Vector3.one * 1.1f, raizEntorno);
+        // Edificios e infraestructura del pueblo (BoxCollider ajustado estrictamente a su volumen visible)
+        PonerConBoxAjustado("Equipos/tanque", new Vector3(-10.5f, 0f, 8.2f), Vector3.zero, Vector3.one * 1.15f, raizEntorno, capaSeguro);
+        PonerConBoxAjustado("Equipos/bomba_agua", new Vector3(-8.0f, 0f, 8.2f), new Vector3(0f, 90f, 0f), Vector3.one * 1.25f, raizEntorno, capaSeguro);
+        PonerConBoxAjustado("Edificios/clinica", new Vector3(9.0f, 0f, 6.2f), new Vector3(0f, -90f, 0f), Vector3.one * 0.95f, raizEntorno, capaSeguro);
+        PonerConBoxAjustado("Edificios/casa_ladrillo", new Vector3(-9.5f, 0f, -8.5f), new Vector3(0f, 90f, 0f), Vector3.one * 0.9f, raizEntorno, capaSeguro);
+        PonerConBoxAjustado("Edificios/fuente", new Vector3(0.5f, 0f, -7.8f), Vector3.zero, Vector3.one, raizEntorno, capaSeguro);
+        PonerConBoxAjustado("Equipos/lavadero", new Vector3(4.5f, 0f, -8.5f), new Vector3(0f, 180f, 0f), Vector3.one * 1.15f, raizEntorno, capaSeguro);
+        PonerConBoxAjustado("Mercado/puesto", new Vector3(-1.5f, 0f, 8.5f), Vector3.zero, Vector3.one, raizEntorno, capaSeguro);
+
+        foreach (var posEuc in new[] { new Vector3(-12.2f, 0f, 2.5f), new Vector3(12.2f, 0f, -2.5f) })
+        {
+            var euc = Poner("Naturaleza/eucalipto", posEuc, Vector3.zero, Vector3.one * 1.1f, raizEntorno);
+            if (euc != null)
+            {
+                var bcTronco = euc.AddComponent<BoxCollider>();
+                bcTronco.center = new Vector3(0f, 1.1f, 0f);
+                bcTronco.size = new Vector3(0.5f, 2.2f, 0.5f);
+                CapaRecursiva(euc, capaSeguro);
+            }
+        }
         Poner("Naturaleza/montana", new Vector3(18f, -3f, 48f), new Vector3(0f, 35f, 0f), new Vector3(6f, 4.5f, 6f), raizEntorno);
 
         Material matSeca = CargarMaterial("M_Tuberia_Seca");
@@ -335,7 +403,7 @@ public static class ConstructorRed3D
         }, matCian);
 
         // Tramo de fuga rota hacia (-3.0, 0.05, 1.5)
-        var tuboRoto = Poner("Ruinas_e_industria/tubo_roto_base", new Vector3(-3.0f, 0f, 1.6f), new Vector3(0f, 90f, 0f), Vector3.one * 1.25f, raizTuberias);
+        PonerConBoxAjustado("Ruinas_e_industria/tubo_roto_base", new Vector3(-3.0f, 0f, 1.6f), new Vector3(0f, 90f, 0f), Vector3.one * 1.25f, raizTuberias, capaSeguro);
         var visualFuga = CrearVisualFugaActiva(new Vector3(-3.0f, 0.35f, 1.6f), raizTuberias, matChorro);
 
         // Ramal hacia Centro de Salud (de (1.5, 0.05, 4.5) a (6.0, 0.05, 6.0))
@@ -498,6 +566,7 @@ public static class ConstructorRed3D
         var colGo = new GameObject("MuroCol");
         colGo.transform.SetParent(padre, false);
         colGo.transform.position = centro + Vector3.up * (tamCollider.y * 0.5f);
+        colGo.layer = capaSeguro >= 0 ? capaSeguro : 0;
         var bc = colGo.AddComponent<BoxCollider>();
         bc.size = tamCollider;
 
@@ -516,7 +585,7 @@ public static class ConstructorRed3D
         grupo.SetParent(padre, false);
         foreach (var p in puntos)
         {
-            var t = Poner("Tuberías/tubo_largo", p, new Vector3(0f, 90f, 0f), Vector3.one * 1.15f, grupo);
+            var t = PonerConBoxAjustado("Tuberías/tubo_largo", p, new Vector3(0f, 90f, 0f), Vector3.one * 1.15f, grupo, capaSeguro);
             if (t == null) continue;
             foreach (var r in t.GetComponentsInChildren<Renderer>(true))
             {
@@ -570,6 +639,7 @@ public static class ConstructorRed3D
         var col = raiz.AddComponent<BoxCollider>();
         col.center = new Vector3(0f, 0.7f, 0f);
         col.size = new Vector3(1.1f, 1.4f, 1.0f);
+        DesactivarEstaticoRecursivo(raiz);
         CapaRecursiva(raiz, capaInteractuable);
 
         var nv = raiz.AddComponent<NodoValvula3D>();
@@ -598,8 +668,8 @@ public static class ConstructorRed3D
         var chorro = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         chorro.name = "Chorro";
         chorro.transform.SetParent(raiz.transform, false);
-        chorro.transform.localPosition = new Vector3(0f, 0.9f, 0f);
-        chorro.transform.localScale = new Vector3(0.7f, 1f, 0.7f);
+        chorro.transform.localPosition = new Vector3(0f, 1.1f, 0f);
+        chorro.transform.localScale = new Vector3(0.7f, 1.1f, 0.7f);
         Object.DestroyImmediate(chorro.GetComponent<Collider>());
 
         var rb = raiz.AddComponent<Rigidbody>();
@@ -607,17 +677,23 @@ public static class ConstructorRed3D
         rb.useGravity = false;
         rb.interpolation = RigidbodyInterpolation.Interpolate;
 
-        var bc = raiz.AddComponent<BoxCollider>();
-        bc.center = new Vector3(0f, 1.0f, 0f);
-        bc.size = new Vector3(0.85f, 2.0f, 0.85f);
+        var cap = raiz.AddComponent<CapsuleCollider>();
+        cap.direction = 1;
+        cap.radius = 0.35f;
+        cap.height = 2.2f;
+        cap.center = new Vector3(0f, 1.1f, 0f);
+        cap.enabled = false;
 
         var cf = raiz.AddComponent<ChorroFugaMovil3D>();
         cf.modo = ModoObstaculoSuperficie.PulsoGeiser;
         cf.desfaseInicial = desfase;
+        cf.radioChorro = 0.35f;
+        cf.alturaMaximaChorro = 2.2f;
         cf.visualChorro = chorro.transform;
         cf.rendererChorro = chorro.GetComponent<Renderer>();
         cf.matPreAvisoAmbar = matAmbar;
         cf.matChorroCian = matChorro;
+        DesactivarEstaticoRecursivo(raiz);
         CapaRecursiva(raiz, capaPeligro);
     }
 
@@ -628,21 +704,20 @@ public static class ConstructorRed3D
         raiz.transform.position = pos;
         raiz.layer = capaPeligro;
 
-        Poner("Obra/barrera", pos, Vector3.zero, Vector3.one * 1.1f, raiz.transform);
+        var barrera = Poner("Obra/barrera", pos, Vector3.zero, Vector3.one * 1.1f, raiz.transform);
 
         var rb = raiz.AddComponent<Rigidbody>();
         rb.isKinematic = true;
         rb.useGravity = false;
         rb.interpolation = RigidbodyInterpolation.Interpolate;
 
-        var bc = raiz.AddComponent<BoxCollider>();
-        bc.center = new Vector3(0f, 0.6f, 0f);
-        bc.size = new Vector3(2.2f, 1.2f, 0.45f);
+        AgregarBoxAjustado(raiz, barrera != null ? barrera : raiz, capaPeligro);
 
         var cf = raiz.AddComponent<ChorroFugaMovil3D>();
         cf.modo = ModoObstaculoSuperficie.BarreraOscilante;
         cf.desplazamiento = desplazamiento;
         cf.velocidad = velocidad;
+        DesactivarEstaticoRecursivo(raiz);
         CapaRecursiva(raiz, capaPeligro);
     }
 }

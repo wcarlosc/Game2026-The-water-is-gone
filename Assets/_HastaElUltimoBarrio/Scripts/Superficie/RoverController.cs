@@ -33,13 +33,24 @@ public class RoverController : MonoBehaviour
 
     void Awake()
     {
+        LimpiarStaticRecursivo(gameObject);
+
         rb = GetComponent<Rigidbody>();
         rb.useGravity = true;
-        rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
+        rb.constraints = RigidbodyConstraints.FreezeRotation;
         rb.interpolation = RigidbodyInterpolation.Interpolate;
         rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+        rb.WakeUp();
         capaPeligro = LayerMask.NameToLayer("Peligro");
         puntoReaparicion = transform.position;
+    }
+
+    static void LimpiarStaticRecursivo(GameObject raiz)
+    {
+        if (raiz == null) return;
+        raiz.isStatic = false;
+        foreach (Transform t in raiz.transform)
+            LimpiarStaticRecursivo(t.gameObject);
     }
 
     void Update()
@@ -123,12 +134,15 @@ public class RoverController : MonoBehaviour
             velObj,
             aceleracion * Time.fixedDeltaTime);
 
+        if (dirMundo.sqrMagnitude > 0.001f && rb.IsSleeping())
+            rb.WakeUp();
+
         rb.linearVelocity = new Vector3(nuevaHoriz.x, velActual.y, nuevaHoriz.z);
 
         if (visual != null && nuevaHoriz.sqrMagnitude > 0.08f)
         {
             Quaternion rotObj = Quaternion.LookRotation(nuevaHoriz.normalized, Vector3.up);
-            visual.rotation = Quaternion.Slerp(visual.rotation, rotObj, Time.fixedDeltaTime * 10f);
+            visual.localRotation = Quaternion.Slerp(visual.localRotation, rotObj, Time.fixedDeltaTime * 10f);
         }
     }
 
