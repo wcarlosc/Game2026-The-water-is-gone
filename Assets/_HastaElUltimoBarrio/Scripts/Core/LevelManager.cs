@@ -45,6 +45,8 @@ public class LevelManager : MonoBehaviour
 
     void Start()
     {
+        CargadorEscenasSeguro.AsegurarEventSystemInputSystem();
+        MisionTutorialUI.AsegurarEnEscena();
         inicioNivelTiempo = Time.time;
         GameManager.Instancia.Telemetria.IniciarNivel(SceneManager.GetActiveScene().name, EnergiaInicial);
         if (Mensaje != null) Mensaje(objetivo, 4f);
@@ -52,7 +54,7 @@ public class LevelManager : MonoBehaviour
 
     public void ConsumirEnergia(float cantidad)
     {
-        if (Terminado) return;
+        if (Terminado || MisionTutorialUI.PausaActiva) return;
         Energia -= cantidad;
         if (Energia <= 0f)
         {
@@ -107,9 +109,7 @@ public class LevelManager : MonoBehaviour
         if (Mensaje != null) Mensaje(motivo + "\nReiniciando nivel...", 2.5f);
         yield return new WaitForSeconds(2.5f);
         // La energía vuelve a la inicial porque el sobrante del GameManager no cambió.
-        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex >= 0
-            ? SceneManager.GetActiveScene().name
-            : SceneManager.GetActiveScene().path);
+        CargadorEscenasSeguro.RecargarEscenaActual();
     }
 
     public void Completar()
@@ -132,19 +132,25 @@ public class LevelManager : MonoBehaviour
         if (Resultado != null) Resultado(txt);
         yield return new WaitForSeconds(4f);
 
-        string destino = siguienteEscena;
-        if (string.IsNullOrEmpty(destino))
+        string destino = !string.IsNullOrEmpty(siguienteEscena)
+            ? siguienteEscena
+            : CatalogoFichasMision.ObtenerSiguienteEscenaPorDefecto(SceneManager.GetActiveScene().name);
+
+        if (!string.IsNullOrEmpty(destino) && CargadorEscenasSeguro.IntentarCargar(destino))
+            yield break;
+
+        if (string.IsNullOrEmpty(siguienteEscena))
         {
             int sig = SceneManager.GetActiveScene().buildIndex + 1;
             if (sig > 0 && sig < SceneManager.sceneCountInBuildSettings)
             {
+                CargadorEscenasSeguro.PrepararCambioEscena();
                 SceneManager.LoadScene(sig);
                 yield break;
             }
             if (Resultado != null) Resultado(txt + "\n\nFin de los túneles");
             yield break;
         }
-        if (Application.CanStreamedLevelBeLoaded(destino)) SceneManager.LoadScene(destino);
-        else if (Resultado != null) Resultado(txt + "\n\n(Falta la escena " + destino + ")");
+        if (Resultado != null) Resultado(txt + "\n\n(Falta la escena " + destino + ")");
     }
 }

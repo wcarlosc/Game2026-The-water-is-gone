@@ -21,6 +21,7 @@ public class HUDTunel : MonoBehaviour
 
     void Start()
     {
+        CargadorEscenasSeguro.AsegurarEventSystemInputSystem();
         lm = LevelManager.Instancia;
         fuente = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         Construir();
@@ -52,6 +53,7 @@ public class HUDTunel : MonoBehaviour
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1920, 1080);
         scaler.matchWidthOrHeight = 0.5f;
+        canvasGo.AddComponent<GraphicRaycaster>();
 
         var panel = Caja(canvasGo.transform, "Panel", new Vector2(0, 1), new Vector2(30, -30), new Vector2(460, 150), new Color(0.05f, 0.08f, 0.1f, 0.6f));
         Texto(panel, "Energía", new Vector2(20, -14), new Vector2(200, 34), 26, Color.white, TextAnchor.MiddleLeft);
@@ -73,14 +75,28 @@ public class HUDTunel : MonoBehaviour
         sombra.effectColor = new Color(0, 0, 0, 0.8f);
         sombra.effectDistance = new Vector2(2, -2);
 
-        var res = Caja(canvasGo.transform, "Resultado", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(720, 420), new Color(0.05f, 0.08f, 0.1f, 0.88f));
+        var res = Caja(canvasGo.transform, "Resultado", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(740, 440), new Color(0.05f, 0.08f, 0.1f, 0.90f));
         res.pivot = new Vector2(0.5f, 0.5f);
         res.anchoredPosition = Vector2.zero;
         panelResultado = res.gameObject;
-        txtResultado = Texto(res, "", Vector2.zero, new Vector2(680, 400), 36, Color.white, TextAnchor.MiddleCenter);
+        txtResultado = Texto(res, "", Vector2.zero, new Vector2(680, 320), 34, Color.white, TextAnchor.MiddleCenter);
         var rtR = txtResultado.rectTransform;
         rtR.anchorMin = rtR.anchorMax = rtR.pivot = new Vector2(0.5f, 0.5f);
-        rtR.anchoredPosition = Vector2.zero;
+        rtR.anchoredPosition = new Vector2(0f, 34f);
+
+        var rtBtn = Caja(res, "BtnMenuTunel", new Vector2(0.5f, 0f), new Vector2(0f, 22f), new Vector2(320f, 48f), Ambar);
+        rtBtn.pivot = new Vector2(0.5f, 0f);
+        var btn = rtBtn.gameObject.AddComponent<Button>();
+        btn.onClick.AddListener(() => CargadorEscenasSeguro.IntentarCargar("MenuPrincipal"));
+        var txtBtn = Texto(rtBtn, "Volver al Menú Principal", Vector2.zero, new Vector2(320f, 48f), 20, Color.black, TextAnchor.MiddleCenter);
+        txtBtn.fontStyle = FontStyle.Bold;
+        var rtTB = txtBtn.rectTransform;
+        rtTB.anchorMin = Vector2.zero;
+        rtTB.anchorMax = Vector2.one;
+        rtTB.pivot = new Vector2(0.5f, 0.5f);
+        rtTB.offsetMin = Vector2.zero;
+        rtTB.offsetMax = Vector2.zero;
+
         panelResultado.SetActive(false);
     }
 
