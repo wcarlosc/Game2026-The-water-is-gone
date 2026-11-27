@@ -17,7 +17,8 @@ public class Bateria : MonoBehaviour
 
     void OnTriggerEnter(Collider otro)
     {
-        if (otro.GetComponentInParent<DronController>() == null) return;
+        if (!otro.CompareTag("Player") && otro.GetComponentInParent<DronController>() == null) return;
+        AudioManager.Instancia.SonarBateria();
         if (LevelManager.Instancia != null) LevelManager.Instancia.SumarEnergia(energia);
         Destroy(gameObject);
     }

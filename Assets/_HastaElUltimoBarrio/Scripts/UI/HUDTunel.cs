@@ -14,6 +14,10 @@ public class HUDTunel : MonoBehaviour
     float mensajeHasta;
     Font fuente;
     LevelManager lm;
+    int ultDecimasEnergia = -1;
+    int ultPuntaje = -1;
+    int ultChoques = -1;
+    int ultMaxChoques = -1;
 
     void Start()
     {
@@ -57,7 +61,7 @@ public class HUDTunel : MonoBehaviour
         barraRelleno = Caja(fondo, "BarraRelleno", new Vector2(0, 1), Vector2.zero, new Vector2(420, 22), Ambar);
         barraImagen = barraRelleno.GetComponent<Image>();
 
-        txtPuntaje = Texto(panel, "Puntaje 100", new Vector2(20, -92), new Vector2(220, 40), 28, Color.white, TextAnchor.MiddleLeft);
+        txtPuntaje = Texto(panel, "Puntaje 100%", new Vector2(20, -92), new Vector2(220, 40), 28, Color.white, TextAnchor.MiddleLeft);
         txtChoques = Texto(panel, "Choques 0/5", new Vector2(240, -92), new Vector2(200, 40), 28, Color.white, TextAnchor.MiddleRight);
 
         txtMensaje = Texto(canvasGo.transform, "", Vector2.zero, new Vector2(1400, 160), 40, Color.white, TextAnchor.MiddleCenter);
@@ -120,10 +124,27 @@ public class HUDTunel : MonoBehaviour
         barraRelleno.sizeDelta = new Vector2(420f * frac, 22f);
         bool poco = lm.Energia <= 3f;
         barraImagen.color = poco ? Color.Lerp(Ambar, Color.red, Mathf.PingPong(Time.time * 3f, 1f)) : Ambar;
-        txtEnergia.text = lm.Energia.ToString("0.0");
-        txtPuntaje.text = "Puntaje " + lm.Puntaje;
-        txtChoques.text = "Choques " + lm.Choques + "/" + lm.choquesParaReiniciar;
-        txtChoques.color = lm.Choques >= lm.choquesParaReiniciar - 1 ? new Color(1f, 0.4f, 0.3f) : Color.white;
+
+        int decimas = Mathf.RoundToInt(lm.Energia * 10f);
+        if (decimas != ultDecimasEnergia)
+        {
+            ultDecimasEnergia = decimas;
+            txtEnergia.text = (decimas * 0.1f).ToString("0.0");
+        }
+
+        if (lm.Puntaje != ultPuntaje)
+        {
+            ultPuntaje = lm.Puntaje;
+            txtPuntaje.text = "Puntaje " + ultPuntaje + "%";
+        }
+
+        if (lm.Choques != ultChoques || lm.choquesParaReiniciar != ultMaxChoques)
+        {
+            ultChoques = lm.Choques;
+            ultMaxChoques = lm.choquesParaReiniciar;
+            txtChoques.text = "Choques " + ultChoques + "/" + ultMaxChoques;
+            txtChoques.color = ultChoques >= ultMaxChoques - 1 ? new Color(1f, 0.4f, 0.3f) : Color.white;
+        }
 
         if (txtMensaje.text.Length > 0)
         {
