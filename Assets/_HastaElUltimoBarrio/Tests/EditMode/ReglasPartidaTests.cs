@@ -157,9 +157,13 @@ namespace HastaElUltimoBarrio.Tests.EditMode
                     Assert.IsFalse(string.IsNullOrEmpty(c.Accion));
                 }
                 Assert.GreaterOrEqual(ficha.PasosGanar.Length, 3, niveles[i]);
-                Assert.AreEqual(i >= 6, ficha.EsSuperficie3D, niveles[i]);
+                Assert.AreEqual(i >= 2, ficha.EsSuperficie3D, niveles[i]);
+                if (i >= 2 && i <= 5)
+                    StringAssert.Contains("WASD", ficha.Controles[0].Tecla, niveles[i]);
             }
 
+            Assert.AreEqual("LVL_03_SifonMercado", CatalogoFichasMision.ObtenerSiguienteEscenaPorDefecto("LVL_02_TunelPresion"));
+            Assert.AreEqual("LVL_07_AislamientoFuga", CatalogoFichasMision.ObtenerSiguienteEscenaPorDefecto("LVL_06_CamaraRefugioPuente"));
             Assert.AreEqual("LVL_08_DepositoRegulacion", CatalogoFichasMision.ObtenerSiguienteEscenaPorDefecto("LVL_07_AislamientoFuga"));
             Assert.AreEqual("LVL_09_PlazaControlEquidad", CatalogoFichasMision.ObtenerSiguienteEscenaPorDefecto("LVL_08_DepositoRegulacion"));
             Assert.AreEqual("MenuPrincipal", CatalogoFichasMision.ObtenerSiguienteEscenaPorDefecto("LVL_09_PlazaControlEquidad"));

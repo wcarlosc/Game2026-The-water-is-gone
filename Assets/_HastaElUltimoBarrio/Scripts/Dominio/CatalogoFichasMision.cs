@@ -55,6 +55,22 @@ namespace HastaElUltimoBarrio.Dominio
             new FilaControlMision("MÁX. 5 CHOQUES", "Puntaje 100%", "Cada colisión en roca Peligro resta 20%; 5 reinician.")
         };
 
+        static readonly FilaControlMision[] ControlesRoverTransicion =
+        {
+            new FilaControlMision("WASD / FLECHAS", "Conducir Rover SCADA", "Desplázate por la superficie en perspectiva isométrica 3D."),
+            new FilaControlMision("PELIGROS FIJOS", "Reconocimiento sin móviles", "Rodea zanjas, escombros y fugas estáticas en capa Peligro."),
+            new FilaControlMision("10 + SOBRANTE", "Batería acumulativa", "Conserva energía recogiendo baterías ámbar durante el recorrido."),
+            new FilaControlMision("MÁX. 5 CHOQUES", "Puntaje 100%", "Cada choque resta 20%; al 5.º impacto se reinicia el nivel.")
+        };
+
+        static readonly FilaControlMision[] ControlesRoverObstaculos =
+        {
+            new FilaControlMision("WASD / FLECHAS", "Conducir Rover SCADA", "Cruza las rutas urbanas coordinando giros en perspectiva 3D."),
+            new FilaControlMision("SINCRONÍA", "Obstáculos móviles", "Espera el pre-aviso ámbar de los géiseres y el ritmo de barreras."),
+            new FilaControlMision("10 + SOBRANTE", "Batería acumulativa", "Inicias con 10.0 más el sobrante guardado del tramo previo."),
+            new FilaControlMision("MÁX. 5 CHOQUES", "Puntaje 100%", "Cada choque en capa Peligro resta 20% y reaparece al inicio.")
+        };
+
         public static string ObtenerSiguienteEscenaPorDefecto(string nombreEscenaActual)
         {
             if (string.IsNullOrEmpty(nombreEscenaActual)) return string.Empty;
@@ -76,14 +92,94 @@ namespace HastaElUltimoBarrio.Dominio
 
             switch (clave)
             {
+                case "LVL_03_SifonMercado":
+                    return new FichaMisionNivel
+                    {
+                        ClaveEscena = clave,
+                        EtiquetaFase = "FASE 2 · TRANSICIÓN A SUPERFICIE 3D",
+                        Titulo = "Nivel 3 · Ruta Exterior al Mercado",
+                        SituacionBarrio =
+                            "El diagnóstico subterráneo terminó. Ahora conduces el Rover SCADA en superficie 3D hacia el acceso " +
+                            "del Mercado Popular sorteando derrumbes y fugas fijas (sin obstáculos móviles).",
+                        EsSuperficie3D = true,
+                        Controles = ControlesRoverTransicion,
+                        PasosGanar = new[]
+                        {
+                            "Conduce con [WASD / Flechas] adaptándote al movimiento isométrico en superficie.",
+                            "Esquiva escombros, zanjas y tuberías rotas estáticas marcadas en capa Peligro.",
+                            "Recoge las baterías ámbar para acumular reserva hacia los niveles con movimiento.",
+                            "Entra en la plataforma de salida (Finish) para avanzar al corredor de Salud."
+                        }
+                    };
+
+                case "LVL_04_ConductoSalud":
+                    return new FichaMisionNivel
+                    {
+                        ClaveEscena = clave,
+                        EtiquetaFase = "FASE 2 · RUTA 3D CON OBSTÁCULOS MÓVILES",
+                        Titulo = "Nivel 4 · Corredor al Centro de Salud",
+                        SituacionBarrio =
+                            "Atraviesas el corredor urbano rumbo al Centro de Salud frente a las primeras barreras de obra " +
+                            "oscilantes y géiseres intermitentes a presión.",
+                        EsSuperficie3D = true,
+                        Controles = ControlesRoverObstaculos,
+                        PasosGanar = new[]
+                        {
+                            "Observa el pre-aviso ámbar de los géiseres y el vaivén de las barreras antes de cruzar.",
+                            "Conduce con [WASD / Flechas] evitando impactos en capa Peligro (máximo 5 choques).",
+                            "Desvíate por los carriles laterales seguros para recoger baterías de respaldo.",
+                            "Alcanza la plataforma PF_ZonaSalida (Finish) preservando el puntaje y energía."
+                        }
+                    };
+
+                case "LVL_05_ImpulsionLadera":
+                    return new FichaMisionNivel
+                    {
+                        ClaveEscena = clave,
+                        EtiquetaFase = "FASE 2 · RUTA 3D CON OBSTÁCULOS MÓVILES",
+                        Titulo = "Nivel 5 · Ascenso hacia Ladera",
+                        SituacionBarrio =
+                            "El trazado asciende hacia las terrazas altas del Barrio de la Ladera sorteando múltiples chorros " +
+                            "de fuga y compuertas cinemáticas que exigen gestionar la batería SCADA.",
+                        EsSuperficie3D = true,
+                        Controles = ControlesRoverObstaculos,
+                        PasosGanar = new[]
+                        {
+                            "Coordina cruces cortos entre ciclos de géiseres con [WASD / Flechas].",
+                            "Recoge las baterías del recorrido antes de encarar el tramo final de barreras.",
+                            "Evita roces contra objetos en capa Peligro para no perder 20% por choque.",
+                            "Posa el Rover sobre PF_ZonaSalida (Finish) rumbo al cruce Refugio-Puente."
+                        }
+                    };
+
+                case "LVL_06_CamaraRefugioPuente":
+                    return new FichaMisionNivel
+                    {
+                        ClaveEscena = clave,
+                        EtiquetaFase = "FASE 2 · RUTA 3D CON OBSTÁCULOS MÓVILES",
+                        Titulo = "Nivel 6 · Cruce Refugio–Puente",
+                        SituacionBarrio =
+                            "Última ruta de aproximación entre el Refugio Comunitario y el Barrio del Puente para conservar " +
+                            "la máxima batería antes de operar las válvulas del grafo hidráulico en Nivel 7.",
+                        EsSuperficie3D = true,
+                        Controles = ControlesRoverObstaculos,
+                        PasosGanar = new[]
+                        {
+                            "Supera los obstáculos móviles combinados aprovechando las pausas seguras.",
+                            "Asegura baterías extra para arrancar la fase de válvulas SCADA con ventaja.",
+                            "Mantén al menos 1 vida libre (< 5 choques) hasta el tramo Sureste.",
+                            "Ingresa en PF_ZonaSalida (Finish) para iniciar la operación de red en Nivel 7."
+                        }
+                    };
+
                 case "LVL_07_AislamientoFuga":
                     return new FichaMisionNivel
                     {
                         ClaveEscena = clave,
-                        EtiquetaFase = "FASE 2 · RED HIDRÁULICA 3D",
+                        EtiquetaFase = "FASE 3 · RED HIDRÁULICA 3D",
                         Titulo = "Nivel 7 · Calle de la Fuga",
                         SituacionBarrio =
-                            "Sales del subsuelo con el Rover SCADA en superficie 3D. Una rotura abierta al Norte desperdicia el 45% " +
+                            "Ingresas al sector con consolas SCADA activas. Una rotura abierta al Norte desperdicia el 45% " +
                             "del caudal mientras el Centro de Salud permanece cerrado y sin esterilización.",
                         EsSuperficie3D = true,
                         Controles = new[]
@@ -106,7 +202,7 @@ namespace HastaElUltimoBarrio.Dominio
                     return new FichaMisionNivel
                     {
                         ClaveEscena = clave,
-                        EtiquetaFase = "FASE 2 · REGULACIÓN ALTITUDINAL",
+                        EtiquetaFase = "FASE 3 · REGULACIÓN ALTITUDINAL",
                         Titulo = "Nivel 8 · Depósito de Regulación",
                         SituacionBarrio =
                             "El Mercado en zona baja (4 m, menor resistencia) está abierto al 100% y acapara presión, dejando a " +
