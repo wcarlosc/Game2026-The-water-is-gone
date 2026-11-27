@@ -72,5 +72,60 @@ namespace HastaElUltimoBarrio.Tests.EditMode
             Assert.AreEqual(12.8f, dto.niveles[1].energiaInicial, 1e-3f);
             Assert.IsTrue(dto.niveles[1].equidadLograda);
         }
+
+        [Test]
+        public void EscenarioNivel08_RegulacionDosRamalesAltitudinales_EquilibraCincoSectores()
+        {
+            var red = GrafoHidraulico.CrearRedArequipaCincoSectores(incluirRamalFugaAislable: false);
+            red.FijarApertura("V1_Mercado", 1.00f);
+            red.FijarApertura("V2_Puente", 0.40f);
+            red.FijarApertura("V3_Salud", 0.65f);
+            red.FijarApertura("V4_Refugio", 0.60f);
+            red.FijarApertura("V5_Ladera", 0.40f);
+
+            var inicial = red.Evaluar(100f);
+            Assert.IsFalse(inicial.TodosAbastecidos);
+            Assert.IsFalse(inicial.Sectores.First(s => s.Id == "S5_Ladera").Abastecido);
+
+            // Regular un solo ramal (solo Ladera al 100% sin estrangular Mercado) sigue en deficit
+            red.FijarApertura("V5_Ladera", 1.00f);
+            Assert.IsFalse(red.Evaluar(100f).TodosAbastecidos);
+
+            // Al regular ambos ramales (Mercado 40% y Ladera 100%) los 5 sectores cumplen minimos
+            red.FijarApertura("V1_Mercado", 0.40f);
+            var equilibrado = red.Evaluar(100f);
+            Assert.IsTrue(equilibrado.TodosAbastecidos);
+            Assert.GreaterOrEqual(equilibrado.IndiceEquidadJain, 0.98f);
+        }
+
+        [Test]
+        public void EscenarioNivel09_SimuladorQuePasariaSiYComparacionOptimoJain()
+        {
+            var red = GrafoHidraulico.CrearRedArequipaCincoSectores(incluirRamalFugaAislable: true);
+            var inicial = red.Evaluar(100f);
+            Assert.IsTrue(inicial.FugaActivaDetectada);
+            Assert.IsTrue(inicial.Sectores.All(s => !string.IsNullOrEmpty(s.ImpactoSocialSinAgua)));
+
+            var propuesta = new Dictionary<string, float>
+            {
+                { "V_AislamientoFuga", 0f },
+                { "V1_Mercado", 0.30f },
+                { "V2_Puente", 0.40f },
+                { "V3_Salud", 0.60f },
+                { "V4_Refugio", 0.60f },
+                { "V5_Ladera", 1.00f }
+            };
+
+            var simulado = red.SimularQuePasariaSi(100f, propuesta);
+            Assert.IsFalse(simulado.FugaActivaDetectada);
+            Assert.IsTrue(simulado.TodosAbastecidos);
+
+            // Simular no debe mutar el estado real del grafo
+            Assert.IsTrue(red.Evaluar(100f).FugaActivaDetectada);
+
+            var optimo = OptimizadorEquidadJain.CalcularOptimo(red, 100f, 0.05f);
+            Assert.IsNotNull(optimo.ResultadoOptimo);
+            Assert.LessOrEqual(Mathf.Abs(optimo.ResultadoOptimo.IndiceEquidadJain - simulado.IndiceEquidadJain), 0.02f);
+        }
     }
 }
