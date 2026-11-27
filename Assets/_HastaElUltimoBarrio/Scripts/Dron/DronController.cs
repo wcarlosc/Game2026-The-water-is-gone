@@ -115,6 +115,7 @@ public class DronController : MonoBehaviour
         if (posado && f.y < 0.5f) f.y = 0.5f; // despegue mínimo para no arrastrarse por la plataforma
         posado = false;
         rb.AddForce(f, ForceMode.Impulse);
+        AudioManager.Instancia.SonarPropulsor();
         if (Mathf.Abs(dir.x) > 0.01f) mirarX = Mathf.Sign(dir.x);
         if (animacion != null && animacion["Impulse"] != null)
         {
@@ -210,10 +211,11 @@ public class DronController : MonoBehaviour
     {
         if (invulnerable > 0f || reapareciendo) return;
         invulnerable = 1f;
+        AudioManager.Instancia.SonarChoque();
         if (sacudida != null) sacudida.GenerateImpulse();
         if (animacion != null && animacion["Crash"] != null) { animacion.Stop("Crash"); animacion.Play("Crash"); }
 
-        bool sigue = LevelManager.Instancia == null || LevelManager.Instancia.RegistrarChoque();
+        bool sigue = LevelManager.Instancia == null || LevelManager.Instancia.RegistrarChoque(transform.position);
         StartCoroutine(Reaparecer(sigue));
     }
 

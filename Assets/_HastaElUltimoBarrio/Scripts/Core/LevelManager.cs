@@ -1,4 +1,5 @@
 using System.Collections;
+using HastaElUltimoBarrio.Dominio;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -29,12 +30,14 @@ public class LevelManager : MonoBehaviour
     public event System.Action<string, float> Mensaje;   // texto, duración
     public event System.Action<string> Resultado;        // tarjeta final
 
+    float inicioNivelTiempo;
+
     void Awake()
     {
         Instancia = this;
         var gm = GameManager.Instancia;
         gm.NivelActual = SceneManager.GetActiveScene().name;
-        EnergiaInicial = energiaBase + gm.EnergiaSobrante;
+        EnergiaInicial = CalculadorReglasCurso.CalcularEnergiaInicial(energiaBase, gm.EnergiaSobrante);
         Energia = EnergiaInicial;
         EnergiaMaxima = Mathf.Max(EnergiaInicial, energiaBase);
         Puntaje = puntajeInicial;
@@ -42,6 +45,8 @@ public class LevelManager : MonoBehaviour
 
     void Start()
     {
+        inicioNivelTiempo = Time.time;
+        GameManager.Instancia.Telemetria.IniciarNivel(SceneManager.GetActiveScene().name, EnergiaInicial);
         if (Mensaje != null) Mensaje(objetivo, 4f);
     }
 
@@ -64,18 +69,27 @@ public class LevelManager : MonoBehaviour
         if (Mensaje != null) Mensaje("+" + cantidad.ToString("0.#") + " energía", 1.2f);
     }
 
-    // Devuelve false si el choque reinicia el nivel.
     public bool RegistrarChoque()
     {
+        return RegistrarChoque(Vector3.zero);
+    }
+
+    // Devuelve false si el choque reinicia el nivel.
+    public bool RegistrarChoque(Vector3 posicionChoque)
+    {
         if (Terminado) return false;
-        Choques++;
-        Puntaje = Mathf.Max(0, Puntaje - puntosPorChoque);
-        if (Choques >= choquesParaReiniciar)
+        Puntaje = CalculadorReglasCurso.CalcularPuntajeTrasChoque(
+            Puntaje, puntosPorChoque, Choques, choquesParaReiniciar,
+            out int nuevosChoques, out bool debeReiniciar);
+        Choques = nuevosChoques;
+        GameManager.Instancia.Telemetria.RegistrarChoque(posicionChoque, Time.time - inicioNivelTiempo);
+
+        if (debeReiniciar)
         {
             Reiniciar("Demasiados choques");
             return false;
         }
-        if (Mensaje != null) Mensaje("¡Choque!  -" + puntosPorChoque, 1.2f);
+        if (Mensaje != null) Mensaje("¡Choque!  -" + puntosPorChoque + "%", 1.2f);
         return true;
     }
 
@@ -83,6 +97,8 @@ public class LevelManager : MonoBehaviour
     {
         if (Terminado) return;
         Terminado = true;
+        GameManager.Instancia.Telemetria.FinalizarNivel(
+            false, Time.time - inicioNivelTiempo, Energia, Puntaje, Choques, motivo);
         StartCoroutine(RutinaReinicio(motivo));
     }
 
@@ -100,15 +116,18 @@ public class LevelManager : MonoBehaviour
     {
         if (Terminado) return;
         Terminado = true;
+        AudioManager.Instancia.SonarLlegada();
         var gm = GameManager.Instancia;
         gm.EnergiaSobrante = Energia;
         gm.GuardarPuntaje(SceneManager.GetActiveScene().name, Puntaje);
+        gm.Telemetria.FinalizarNivel(
+            true, Time.time - inicioNivelTiempo, Energia, Puntaje, Choques, "Completado");
         StartCoroutine(RutinaFin());
     }
 
     IEnumerator RutinaFin()
     {
-        string txt = nombreNivel + " completado\n\nPuntaje: " + Puntaje + "\nChoques: " + Choques +
+        string txt = nombreNivel + " completado\n\nPuntaje: " + Puntaje + "%\nChoques: " + Choques +
                      "\nEnergía sobrante: " + Energia.ToString("0.0");
         if (Resultado != null) Resultado(txt);
         yield return new WaitForSeconds(4f);
